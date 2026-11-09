@@ -739,6 +739,20 @@ html.ds-grab, html.ds-grab * { cursor: grabbing !important; }
   .restpill { gap: 7px; padding-left: 14px; }
   .restpill button { padding: 0 11px; }
 }
+.wu .wu-n { background: rgba(255, 149, 0, .16); color: #e07800; }
+.wu .wu-n svg.i { width: 16px; height: 16px; }
+.wu.done .wu-n { background: var(--green); color: #fff; }
+.wu { background: linear-gradient(150deg, rgba(255, 246, 235, .92), rgba(255, 255, 255, .62)); }
+.wu .xc-h { grid-template-columns: 30px 58px 1fr auto; padding-right: 14px; }
+.wu-tag { display: inline-block; font: 700 11px var(--font); font-style: normal; letter-spacing: .04em; text-transform: uppercase; color: #e07800; margin-bottom: 2px; }
+.wu-info { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; margin: 2px 0 10px; border-radius: 18px; background: rgba(255, 149, 0, .1); border: 1px solid rgba(255, 149, 0, .22); font-size: 13.5px; line-height: 1.4; color: #7a4300; }
+.wu-info svg.i { flex: none; width: 20px; height: 20px; color: #e07800; margin-top: 1px; }
+.wu-ed { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 10px 10px 14px; border-radius: 18px; background: rgba(255, 255, 255, .7); border: 1px solid var(--gb); }
+.wu-ed > span { display: flex; align-items: center; gap: 10px; font-size: 14.5px; font-weight: 500; text-transform: none; color: var(--text); }
+.wu-ed > span svg.i { flex: none; width: 20px; height: 20px; color: #e07800; }
+.wu-ed small { display: block; font-size: 12px; color: var(--muted); font-weight: 400; margin-top: 2px; }
+.wu-ed .step { flex: none; width: 124px; height: 44px; grid-template-columns: 44px 1fr 44px; }
+.wu-ed .step span { font-size: 14px; }
 
 </style>
 </head>
@@ -1909,6 +1923,7 @@ const I = {
   swap: ic('<path d="M7 7h12l-3-3M17 17H5l3 3"/>'),
   copy: ic('<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>'),
   skip: ic('<path d="M5 5l9 7-9 7zM19 5v14"/>'),
+  warm: ic('<path d="M12 21c3.6 0 6-2.5 6-5.8 0-3.6-2.6-5.5-3.5-8.7-.3 1.9-1.3 3.1-2.4 3.7C12.6 7.5 11.3 4.6 9 3c.4 3-3 5.6-3 10.1C6 18.4 8.4 21 12 21Z"/><path d="M12 21c-1.6 0-2.7-1.1-2.7-2.7 0-1.8 1.4-2.6 2-4.2.9 1 3.4 2.2 3.4 4.3 0 1.5-1.1 2.6-2.7 2.6Z"/>'),
   stack: ic('<rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M5 9h14M5 13h14M5 17h14M12 6v3"/>'),
   barbell: ic('<path d="M2.5 12h19M6 7.5v9M9 6v12M15 6v12M18 7.5v9"/>'),
   pulley: ic('<circle cx="12" cy="5.5" r="2.8"/><path d="M12 8.3V16M8.5 20.5h7M12 16l-3.5 4.5M12 16l3.5 4.5"/>'),
@@ -2021,8 +2036,26 @@ const mkStretch = id => ({ ex: id, sec: 30, done: false });
 function newSession(date, w, name) {
   const s = { date, wid: w ? w.id : null, name: w ? w.name : (name || 'Treino livre'), color: w ? w.color : '#8E8E93', start: Date.now(), end: null, items: [], cardio: [], stretch: [] };
   if (w) for (const it of w.items) addToSession(s, it.ex, it.sets, it.reps);
+  const ws = w ? warmSetsOf(w) : 2;
+  s.warm = ws > 0 && s.items.length ? mkWarm(s.items[0].ex, ws) : ws > 0 ? undefined : null;
   return s;
 }
+/* aquecimento: mesmo exercício do 1º da lista, com pesos leves; fica fora das cargas e estatísticas */
+const warmSetsOf = w => w && w.warmSets != null ? w.warmSets : 2;
+function mkWarm(exId, n) {
+  const e = EXI[exId], r = !e || e.unit === 'reps' ? 12 : e.unit === 's' ? 20 : 100;
+  return { ex: exId, sets: Array.from({ length: n || 2 }, () => ({ w: null, r, done: false })) };
+}
+// o aquecimento acompanha o 1º exercício enquanto nenhuma série dele foi feita
+function syncWarm(s) {
+  if (!s || s.end) return;
+  if (s.warm === undefined && s.items.length && !s.items.some(it => it.sets.some(x => x.done))) { const w = s.wid && wById(s.wid), n = w ? warmSetsOf(w) : 2; s.warm = n ? mkWarm(s.items[0].ex, n) : null; putSession(s); }
+  if (!s.warm || !s.items.length) return;
+  if (s.warm.ex !== s.items[0].ex && !s.warm.sets.some(x => x.done)) { const e = EXI[s.items[0].ex], r = !e || e.unit === 'reps' ? 12 : e.unit === 's' ? 20 : 100; s.warm.ex = s.items[0].ex; s.warm.sets.forEach(x => { x.w = null; x.r = r; }); putSession(s); }
+}
+const ix = t => t.dataset.i === 'w' ? 'w' : +t.dataset.i;
+const itm = (s, i) => i === 'w' ? s.warm : s.items[i];
+const warmDone = s => !s.warm || !s.warm.sets.length || s.warm.sets.every(x => x.done);
 function addToSession(s, id, sets, reps) {
   const e = EXI[id]; if (!e) return;
   if (e.eq === 'cardio') s.cardio.push(mkCardio(id));
@@ -2818,7 +2851,8 @@ function openSession(ds) {
   if (UI.rest && UI.rest.ds !== ds) UI.rest = null;
   UI.sess = ds; UI.open = {}; UI.holds = {};
   const s = getSession(ds); if (!s) return;
-  const firstOpen = s.items.findIndex(it => !it.sets.every(x => x.done)); if (firstOpen >= 0 && !s.end) UI.open[firstOpen] = true;
+  syncWarm(s); UI.wOpen = !!(s.warm && s.items.length && !s.end && !warmDone(s) && !s.items.some(it => it.sets.some(x => x.done)));
+  const firstOpen = s.items.findIndex(it => !it.sets.every(x => x.done)); if (firstOpen >= 0 && !s.end && !UI.wOpen) UI.open[firstOpen] = true;
   let el = $('#sess');
   if (!el) { el = document.createElement('div'); el.id = 'sess'; el.className = 'sess'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Treino'); document.body.append(el); el.addEventListener('scroll', () => { if (el.scrollTop || el.scrollLeft) el.scrollTo(0, 0); }); }
   renderSession(); miniBar();
@@ -2837,10 +2871,12 @@ function renderSession() {
   const s = curS(), el = $('#sess'); if (!s || !el) return;
   const y = $('#ss-b') ? $('#ss-b').scrollTop : 0;
   el.style.setProperty('--c', s.color);
+  syncWarm(s);
   let b = '';
+  if (s.warm && s.items.length) b += wuHTML(s);
   if (s.items.length) b += (s.items.length > 1 && !CFG.settings.dragSeen ? `<div class="dhint">${I.drag}<span>Segure um exercício e arraste para mudar a ordem</span></div>` : '') + `<div class="xc-l" id="xc-l">${s.items.map((_, i) => xcHTML(s, i)).join('')}</div>`;
   else if (!s.cardio.length && !s.stretch.length) b += `<div class="empty" style="margin-top:8px">Adicione exercícios, aeróbico ou alongamento para começar.</div>`;
-  b += `<div class="addrow" style="margin-top:12px"><button class="btn sm tap" data-a="addEx">${I.plus} Exercício</button></div>`;
+  b += `<div class="addrow" style="margin-top:12px"><button class="btn sm tap" data-a="addEx">${I.plus} Exercício</button>${!s.warm && s.items.length && !s.end ? `<button class="btn sm tap" data-a="wuAdd">${I.warm} Aquecimento</button>` : ''}</div>`;
   b += `<div class="sec-l" style="--c:var(--cardio)">${I.pulse} Aeróbico <small>${s.cardio.length ? s.cardio.reduce((a, c) => a + (+c.min || 0), 0) + ' min' : 'opcional'}</small></div>` + s.cardio.map((_, i) => ccHTML(s, i)).join('') + `<button class="btn sm block tap" data-a="addCardio">${I.plus} Adicionar aeróbico</button>`;
   b += `<div class="sec-l" style="--c:var(--stretch)">${I.leaf} Alongamento <small>${s.stretch.length ? s.stretch.length + ' posições' : 'opcional'}</small></div>` + s.stretch.map((_, i) => stHTML(s, i)).join('') + `<button class="btn sm block tap" data-a="addStretch">${I.plus} Adicionar alongamento</button>`;
   el.innerHTML = `<div class="bgfx"></div><div class="ss-h"><button class="icon-btn tap" data-a="sessMin" aria-label="Minimizar">${I.chevD}</button><div class="ss-ttl"><b>${esc(s.name)}</b><span id="ss-time">${sessTime(s)}</span></div><button class="icon-btn tap" data-a="sessMenu" aria-label="Mais opções">${I.more}</button><div class="prog"><i id="ss-prog"></i></div></div><div class="ss-b" id="ss-b">${b}</div><div class="ss-f"><button class="btn primary tap" data-a="finish">${s.end ? 'Salvar alterações' : 'Finalizar treino'}</button></div><div class="restpill" id="rest" aria-live="polite"><span class="rp-l"><i>Descanso</i><small id="rest-n"></small></span><b id="rest-t">1:30</b><button class="tap" data-a="restAdd">+15</button><button class="tap" data-a="restSkip" aria-label="Pular descanso">${I.skip}</button></div>`;
@@ -2887,6 +2923,29 @@ function ssReveal(el, block = 'start') {
   else return;
   sc.scrollTo({ top: Math.max(0, top), behavior: RM() ? 'auto' : 'smooth' });
 }
+function wuHTML(s) {
+  const w = s.warm, e = EXI[w.ex]; if (!e) return '';
+  const open = !!UI.wOpen, nd = w.sets.filter(x => x.done).length, done = warmDone(s);
+  return `<article class="xc wu ${open ? 'open' : ''} ${done ? 'done' : ''}" id="xc-w"><button class="xc-h tap" data-a="wuToggle" aria-expanded="${open}"><span class="xc-n wu-n">${done ? CHK.replace('<svg', '<svg style="width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:3.2"') : I.warm}</span>${Anim.svg(e.arch, e.eq, e.at ? { at: e.at } : undefined).replace('class="fig"', 'class="fig th"')}<span class="xc-t"><em class="wu-tag">Aquecimento</em><b>${esc(e.name)}</b><small>${w.sets.length} séries leves · não conta nas cargas</small></span><span class="xc-st"><span id="xc-c-w">${nd}/${w.sets.length}</span>${I.chevD}</span></button><div class="xc-b"><div class="xc-bi"><div class="xc-bp" id="xc-bp-w">${open ? wuBody(s) : ''}</div></div></div></article>`;
+}
+function wuHead(s) { const sm = $('#xc-w .xc-t small'); if (sm) sm.textContent = `${s.warm.sets.length} séries leves · não conta nas cargas`; }
+function wuSetDone(s) {
+  if (!warmDone(s)) { startRest(CFG.settings.rest); return; }
+  const nx = s.items.findIndex(it => !(it.sets.length && it.sets.every(x => x.done)));
+  if (nx >= 0) startRest(CFG.settings.restEx, EXI[s.items[nx].ex].name);
+  setTimeout(() => {
+    const cs = curS(); if (!cs || cs.date !== s.date) return;
+    UI.wOpen = false; const card = $('#xc-w'); if (card) card.classList.remove('open');
+    if (nx >= 0) { openCard(nx); const c = $('#xc-' + nx); setTimeout(() => ssReveal(c, 'start'), 260); }
+  }, 750);
+}
+function wuBody(s) {
+  const e = EXI[s.warm.ex], last = lastPerf(s.warm.ex, s.date);
+  let h = `<div class="wu-info">${I.warm}<span>Séries leves do 1º exercício só para aquecer. Escolha pesos menores — elas <b>não entram</b> na progressão de carga nem nas estatísticas.${last && last.top != null && e.unit === 'reps' ? ` Último peso de trabalho: <b>${fmtW(last.top)} kg</b>.` : ''}</span></div>`;
+  h += `<div class="sets" id="sets-w">${setsHTML(s, 'w')}</div>`;
+  h += `<div class="xc-f"><button class="btn sm tap" data-a="addSet" data-i="w">${I.plus} Série</button><button class="btn sm tap" data-a="delSet" data-i="w">${I.minus} Série</button><button class="btn sm tap" data-a="wuSkip" aria-label="Pular aquecimento" style="flex:0 0 auto;padding:0 14px">Pular</button></div>`;
+  return h;
+}
 function updProg() { const s = curS(); const p = $('#ss-prog'); if (s && p) p.style.width = Math.round(sessStats(s).pct * 100) + '%'; }
 function unitLabel(e) { return e.unit === 's' ? 's' : e.unit === 'm' ? 'm' : ''; }
 function xcHTML(s, i) {
@@ -2907,7 +2966,7 @@ function xcBody(s, i) {
   return h;
 }
 function setsHTML(s, i) {
-  const it = s.items[i], e = EXI[it.ex], last = lastPerf(it.ex, s.date), weighted = !!WEIGHTS[e.eq];
+  const it = itm(s, i), e = EXI[it.ex], last = i === 'w' ? null : lastPerf(it.ex, s.date), weighted = !!WEIGHTS[e.eq];
   const rl = e.unit === 's' ? 'Seg' : e.unit === 'm' ? 'Metros' : 'Reps';
   let h = `<div class="set-h"><span>Série</span><span>${weighted ? (e.eq === 'db' ? 'Kg cada' : e.eq === 'bw' ? 'Lastro' : 'Kg') : ''}</span><span>${rl}</span><span></span></div>`;
   it.sets.forEach((x, j) => {
@@ -2920,9 +2979,9 @@ function setsHTML(s, i) {
   return h;
 }
 function refreshSets(i) {
-  const s = curS(); if (!s) return; const it = s.items[i]; const box = $('#sets-' + i); if (box) box.innerHTML = setsHTML(s, i);
+  const s = curS(); if (!s) return; const it = itm(s, i); if (!it) return; const box = $('#sets-' + i); if (box) box.innerHTML = setsHTML(s, i);
   const c = $('#xc-c-' + i); if (c) c.textContent = `${it.sets.filter(x => x.done).length}/${it.sets.length}`;
-  const card = $('#xc-' + i); if (card) { const done = !!(it.sets.length && it.sets.every(x => x.done)); if (card.classList.contains('done') !== done) { card.classList.toggle('done', done); const n = $('.xc-n', card); if (n) n.innerHTML = done ? CHK.replace('<svg', '<svg style="width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:3.2"') : i + 1; } }
+  const card = $('#xc-' + i); if (card) { const done = !!(it.sets.length && it.sets.every(x => x.done)); if (card.classList.contains('done') !== done) { card.classList.toggle('done', done); const n = $('.xc-n', card); if (n) n.innerHTML = done ? CHK.replace('<svg', '<svg style="width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:3.2"') : (i === 'w' ? I.warm : i + 1); } }
   updProg();
 }
 function ccHTML(s, i) {
@@ -2973,13 +3032,14 @@ function platesSVG(w) {
   return s + `<p>${txt}</p>`;
 }
 function openWeightPicker(i, j) {
-  const s = curS(), it = s.items[i], e = EXI[it.ex], list = WEIGHTS[e.eq] || WEIGHTS.mc, last = lastPerf(it.ex, s.date), sg = suggest(it.ex, s.date, true);
-  const cur = it.sets[j].w ?? (j > 0 && it.sets[j - 1].w != null ? it.sets[j - 1].w : null) ?? (last ? last.top : null) ?? list[Math.min(list.length - 1, e.eq === 'db' ? 7 : e.eq === 'bar' ? 8 : 4)];
+  const s = curS(), wu = i === 'w', it = itm(s, i), e = EXI[it.ex], list = WEIGHTS[e.eq] || WEIGHTS.mc, last = lastPerf(it.ex, s.date), sg = !wu && suggest(it.ex, s.date, true);
+  const wuStart = last && last.top != null ? last.top * 0.5 : null;
+  const cur = it.sets[j].w ?? (j > 0 && it.sets[j - 1].w != null ? it.sets[j - 1].w : null) ?? (wu ? wuStart : last ? last.top : null) ?? list[Math.min(list.length - 1, wu ? 2 : e.eq === 'db' ? 7 : e.eq === 'bar' ? 8 : 4)];
   let k = 0, bd = Infinity; list.forEach((v, n) => { const d = Math.abs(v - cur); if (d < bd) { bd = d; k = n; } });
   WP = { i, j, list, k, eq: e.eq };
-  const hint = [last && last.top != null ? `Último: ${fmtW(last.top)} kg` : '', sg ? `Sugestão: <b>${fmtW(sg.to)} kg</b>` : ''].filter(Boolean).join(' · ');
+  const hint = wu ? `Aquecimento: use um peso leve${last && last.top != null ? ` (seu peso de trabalho é ${fmtW(last.top)} kg)` : ''}` : [last && last.top != null ? `Último: ${fmtW(last.top)} kg` : '', sg ? `Sugestão: <b>${fmtW(sg.to)} kg</b>` : ''].filter(Boolean).join(' · ');
   const body = `<div class="wp-val"><b id="wp-v">${fmtW(list[k])}</b><small>${EQUIP[e.eq].unit}</small></div><div class="wp-hint">${hint || 'Arraste a régua ou use − e +'}</div>${e.eq === 'bar' ? `<div class="wp-plates" id="wp-p"></div>` : ''}<div class="ruler-w"><button class="tap" data-a="wpStep" data-v="-1" aria-label="Diminuir">${I.minus}</button><div class="ruler" id="wp-r">${list.map((v, n) => `<button data-a="wpK" data-k="${n}">${fmtW(v)}</button>`).join('')}</div><button class="tap" data-a="wpStep" data-v="1" aria-label="Aumentar">${I.plus}</button></div>`;
-  const o = openSheet({ title: esc(e.name), sub: `Série ${j + 1} de ${it.sets.length} · ${EQUIP[e.eq].name}`, body, foot: `<button class="btn tap" data-a="wpOne">Só esta série</button><button class="btn primary tap" data-a="wpAll">Todas pendentes</button>`, key: 'wp', onClose: () => { WP = null; } });
+  const o = openSheet({ title: esc(e.name), sub: `${wu ? 'Aquecimento · ' : ''}Série ${j + 1} de ${it.sets.length} · ${EQUIP[e.eq].name}`, body, foot: `<button class="btn tap" data-a="wpOne">Só esta série</button><button class="btn primary tap" data-a="wpAll">Todas pendentes</button>`, key: 'wp', onClose: () => { WP = null; } });
   const r = $('#wp-r', o.sh);
   wpPaint(true);
   requestAnimationFrame(() => { r.scrollLeft = WP.k * 60; });
@@ -2993,7 +3053,7 @@ function wpPaint(first) {
 }
 function wpSet(k, smooth = true) { if (!WP) return; WP.k = clamp(k, 0, WP.list.length - 1); const r = $('#wp-r'); if (r) r.scrollTo({ left: WP.k * 60, behavior: smooth ? 'smooth' : 'auto' }); wpPaint(); buzz(5); }
 function wpApply(all) {
-  const s = curS(); if (!s || !WP) return; const it = s.items[WP.i], v = WP.list[WP.k];
+  const s = curS(); if (!s || !WP) return; const it = itm(s, WP.i), v = WP.list[WP.k];
   it.sets.forEach((x, n) => { if (n === WP.j || (all && n >= WP.j && !x.done) || (all && x.w == null)) x.w = v; });
   putSession(s); const i = WP.i; closeSheet(topSheet('wp')); refreshSets(i); buzz(10);
 }
@@ -3023,14 +3083,16 @@ let ED = null;
 function openEditor(wid) {
   const w = wid ? wById(wid) : null;
   ED = w ? JSON.parse(JSON.stringify(w)) : { id: null, name: '', color: WCOLORS[CFG.workouts.length % WCOLORS.length], groups: [], items: [] };
-  ED.openRow = -1;
+  ED.openRow = -1; ED.warmSets = warmSetsOf(ED);
   openSheet({ title: w ? 'Editar treino' : 'Novo treino', full: true, body: edBody(), foot: `${w ? `<button class="btn danger tap" style="flex:0 0 auto" data-a="edDelete" aria-label="Excluir treino">${I.trash}</button>` : ''}<button class="btn tap" data-a="edStart">${I.play} Hoje</button><button class="btn primary tap" data-a="edSave">Salvar</button>`, key: 'ed', onClose: () => { ED = null; } });
   edSortable();
 }
+const warmLabel = n => n ? n + (n === 1 ? ' série' : ' séries') : 'Sem';
 function edBody() {
   return `<label class="field"><span>Nome do treino</span><input class="inp" data-in="edName" value="${esc(ED.name)}" placeholder="Ex.: Costas e bíceps" maxlength="40"></label>
   <div class="field"><span>Cor</span><div class="colors" id="ed-c">${edColors()}</div></div>
   <div class="field"><span>Áreas musculares</span><div class="chips" id="ed-g">${edGroups()}</div></div>
+  <div class="field"><span>Aquecimento</span><div class="wu-ed"><span>${I.warm}<span>Séries leves do 1º exercício antes do treino<small>Não contam nas cargas nem nas estatísticas</small></span></span><div class="step"><button class="tap" data-a="edWarm" data-v="-1" aria-label="Menos">${I.minus}</button><span id="ed-wu">${warmLabel(ED.warmSets)}</span><button class="tap" data-a="edWarm" data-v="1" aria-label="Mais">${I.plus}</button></div></div></div>
   <div class="field"><span>Ordem dos exercícios <em class="fhint">${I.drag} segure e arraste</em></span><div id="ed-l">${edList()}</div><button class="btn sm block tap" data-a="edAdd" style="margin-top:4px">${I.plus} Adicionar exercícios</button></div>`;
 }
 const edColors = () => WCOLORS.map(c => `<button class="tap ${ED.color === c ? 'on' : ''}" style="--c:${c}" data-a="edColor" data-c="${c}" aria-label="Cor"></button>`).join('');
@@ -3050,7 +3112,7 @@ function edSortable() {
 }
 function edCommit() {
   const name = (ED.name || '').trim() || 'Treino ' + (CFG.workouts.length + 1);
-  const data = { id: ED.id || 'w' + rid(), name, color: ED.color, groups: ED.groups, items: ED.items.map(it => ({ ex: it.ex, sets: clamp(+it.sets || 3, 1, 12), reps: String(it.reps || '10') })) };
+  const data = { id: ED.id || 'w' + rid(), name, color: ED.color, groups: ED.groups, items: ED.items.map(it => ({ ex: it.ex, sets: clamp(+it.sets || 3, 1, 12), reps: String(it.reps || '10') })), warmSets: clamp(+ED.warmSets || 0, 0, 5) };
   const k = CFG.workouts.findIndex(w => w.id === data.id);
   if (k >= 0) CFG.workouts[k] = data; else CFG.workouts.push(data);
   saveCfg(); return data;
@@ -3237,27 +3299,31 @@ const ACT = {
     card.classList.toggle('open', UI.open[i]); t.setAttribute('aria-expanded', UI.open[i]); buzz(5);
     if (UI.open[i]) setTimeout(() => ssReveal(card, 'nearest'), 160);
   },
-  pickW: t => openWeightPicker(+t.dataset.i, +t.dataset.j),
+  pickW: t => openWeightPicker(ix(t), +t.dataset.j),
   rep: t => {
-    const s = curS(), i = +t.dataset.i, j = +t.dataset.j, it = s.items[i], e = EXI[it.ex];
+    const s = curS(), i = ix(t), j = +t.dataset.j, it = itm(s, i), e = EXI[it.ex];
     const step = e.unit === 's' || e.unit === 'm' ? 5 : 1;
     it.sets[j].r = clamp((+it.sets[j].r || 0) + (+t.dataset.v) * step, 0, 999); putSession(s);
     const el = $(`#r-${i}-${j}`); if (el) { el.textContent = it.sets[j].r; el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); } buzz(4);
   },
   doneSet: t => {
     ensureAudio();
-    const s = curS(), i = +t.dataset.i, j = +t.dataset.j, it = s.items[i], e = EXI[it.ex], x = it.sets[j];
+    const s = curS(), i = ix(t), j = +t.dataset.j, it = itm(s, i), e = EXI[it.ex], x = it.sets[j];
     if (!x.done && WEIGHTS[e.eq] && x.w == null) { openWeightPicker(i, j); toast('Escolha o peso desta série'); return; }
     x.done = !x.done; putSession(s); buzz(x.done ? 14 : 6);
     t.classList.toggle('on', x.done); t.classList.remove('pop'); void t.offsetWidth; t.classList.add('pop'); t.closest('.set').classList.toggle('done', x.done);
     if (x.done) burst(t);
     setTimeout(() => refreshSets(i), 420);
+    if (x.done && i === 'w') { wuSetDone(s); updProg(); return; }
     if (x.done) {
       const all = it.sets.every(z => z.done);
       if (!all) startRest(CFG.settings.rest);
       else {
         const nx0 = nextOpen(s, i);
-        if (nx0 >= 0) startRest(CFG.settings.restEx, EXI[s.items[nx0].ex].name); else { UI.rest = null; tickTimers(); }
+        const pc = s.cardio.find(c => !c.done), ps = s.stretch.find(c => !c.done);
+        if (nx0 >= 0) startRest(CFG.settings.restEx, EXI[s.items[nx0].ex].name);
+        else if (pc || ps) startRest(CFG.settings.restEx, pc ? 'aeróbico — ' + EXI[pc.ex].name : 'alongamento');
+        else { UI.rest = null; tickTimers(); }
         setTimeout(() => {
           const cs = curS(); if (!cs || cs.date !== s.date) return;
           UI.open[i] = false; const nx = nextOpen(cs, i);
@@ -3269,8 +3335,16 @@ const ACT = {
     }
     updProg();
   },
-  addSet: t => { const s = curS(), i = +t.dataset.i, it = s.items[i], l = it.sets[it.sets.length - 1]; it.sets.push({ w: l ? l.w : null, r: l ? l.r : 10, done: false }); putSession(s); refreshSets(i); buzz(6); },
-  delSet: t => { const s = curS(), i = +t.dataset.i, it = s.items[i]; if (it.sets.length <= 1) return; it.sets.pop(); putSession(s); refreshSets(i); buzz(6); },
+  addSet: t => { const s = curS(), i = ix(t), it = itm(s, i), l = it.sets[it.sets.length - 1]; it.sets.push({ w: l ? l.w : null, r: l ? l.r : 10, done: false }); putSession(s); refreshSets(i); if (i === 'w') wuHead(s); buzz(6); },
+  delSet: t => { const s = curS(), i = ix(t), it = itm(s, i); if (it.sets.length <= 1) return; it.sets.pop(); putSession(s); refreshSets(i); if (i === 'w') wuHead(s); buzz(6); },
+  wuToggle: t => {
+    const s = curS(); UI.wOpen = !UI.wOpen; const card = $('#xc-w'), bp = $('#xc-bp-w'); if (!card || !bp) return;
+    if (UI.wOpen) { bp.innerHTML = wuBody(s); hydrate(bp); } else setTimeout(() => { if (!UI.wOpen) bp.innerHTML = ''; }, 560);
+    card.classList.toggle('open', UI.wOpen); t.setAttribute('aria-expanded', UI.wOpen); buzz(5);
+    if (UI.wOpen) setTimeout(() => ssReveal(card, 'nearest'), 160);
+  },
+  wuSkip: () => { const s = curS(); if (!s) return; s.warm = null; UI.wOpen = false; putSession(s); const nx = s.items.findIndex(it => !it.sets.every(x => x.done)); if (nx >= 0) UI.open = { [nx]: true }; renderSession(); toast('Aquecimento pulado'); buzz(6); },
+  wuAdd: () => { const s = curS(); if (!s || !s.items.length) return; s.warm = mkWarm(s.items[0].ex, 2); UI.wOpen = true; UI.open = {}; putSession(s); renderSession(); setTimeout(() => ssReveal($('#xc-w'), 'start'), 120); buzz(8); },
   rmItem: t => { const i = +t.dataset.i; confirmSheet({ title: 'Remover exercício?', text: 'Ele sai só do treino de hoje. O treino montado continua igual.', ok: 'Remover', danger: true, onOk: () => { const s = curS(); s.items.splice(i, 1); UI.open = {}; putSession(s); renderSession(); } }); },
   applySug: t => { const s = curS(), i = +t.dataset.i, it = s.items[i], g = suggest(it.ex, s.date, true); if (!g) return; it.sets.forEach(x => { if (!x.done) x.w = g.to; }); putSession(s); const b = t.closest('.banner'); if (b) { b.style.transition = 'opacity .3s, transform .4s'; b.style.opacity = '0'; b.style.transform = 'scale(.96)'; setTimeout(() => b.remove(), 300); } refreshSets(i); toast(`Carga ajustada para ${fmtW(g.to)} kg`); buzz(12); },
   addEx: () => { if (topSheet('menu')) closeSheet(topSheet('menu')); openPicker({ title: 'Adicionar exercícios', only: STRENGTH_GROUPS.map(g => g.id), onDone: ids => { const s = curS(); const n0 = s.items.length; ids.forEach(id => addToSession(s, id)); putSession(s); UI.open = { [n0]: true }; renderSession(); setTimeout(() => { const c = $('#xc-' + n0); if (c) ssReveal(c, 'start'); }, 220); } }); },
@@ -3305,6 +3379,7 @@ const ACT = {
   edDel: t => { ED.items.splice(+t.dataset.i, 1); ED.openRow = -1; edRefresh(); buzz(6); },
   edSets: t => { const it = ED.items[+t.dataset.i]; it.sets = clamp((+it.sets || 3) + (+t.dataset.v), 1, 12); edRefresh(); buzz(4); },
   edAdd: () => openPicker({ title: 'Escolha os exercícios', preset: ED.groups.length === 1 ? ED.groups[0] : 'all', cta: 'Adicionar', onDone: ids => { ids.forEach(id => { const e = EXI[id]; ED.items.push({ ex: id, sets: e.eq === 'cardio' || e.eq === 'stretch' ? 1 : 3, reps: e.unit === 's' ? '30' : e.unit === 'm' ? '20' : '10' }); if (!ED.groups.includes(e.group) && STRENGTH_GROUPS.some(g => g.id === e.group)) ED.groups.push(e.group); }); $('#ed-g').innerHTML = edGroups(); edRefresh(); } }),
+  edWarm: t => { ED.warmSets = clamp((ED.warmSets ?? 2) + (+t.dataset.v), 0, 5); $('#ed-wu').textContent = warmLabel(ED.warmSets); buzz(4); },
   edSave: () => { const w = edCommit(); closeSheet(topSheet('ed')); render(); toast(`“${w.name}” salvo`); buzz(12); },
   edStart: () => { const w = edCommit(); const ds = todayISO(); closeSheet(topSheet('ed')); const s = getSession(ds); if (s && (s.items.length || s.cardio.length)) { openSession(ds); toast('Já existe um treino hoje — abri ele para você.'); return; } if (s) delSession(ds); startSession(ds, w.id); },
   edDelete: () => confirmSheet({ title: 'Excluir treino?', text: 'Os registros dos dias já treinados continuam salvos. Dias da semana com este treino passam a ficar livres.', ok: 'Excluir', danger: true, onOk: () => { const id = ED && ED.id; CFG.workouts = CFG.workouts.filter(w => w.id !== id); for (const k in CFG.week) if (CFG.week[k] === id) CFG.week[k] = 'free'; for (const k in CFG.overrides) if (CFG.overrides[k] === id) delete CFG.overrides[k]; saveCfg(); closeSheet(topSheet('ed')); render(); toast('Treino excluído'); } }),
