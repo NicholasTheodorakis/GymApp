@@ -754,6 +754,51 @@ html.ds-grab, html.ds-grab * { cursor: grabbing !important; }
 .wu-ed .step { flex: none; width: 124px; height: 44px; grid-template-columns: 44px 1fr 44px; }
 .wu-ed .step span { font-size: 14px; }
 
+/* evolução de carga por músculo */
+.mgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mcard { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px 12px 13px; border-radius: 24px; text-align: left; overflow: hidden;
+  background: linear-gradient(155deg, color-mix(in srgb, var(--c) 13%, rgba(255, 255, 255, .9)), rgba(255, 255, 255, .62)); border: 1px solid var(--gb); box-shadow: var(--shadow); }
+.mcard::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--c); opacity: .85; }
+.mc-top { display: flex; justify-content: space-between; align-items: flex-start; width: 100%; margin-bottom: 6px; }
+.mc-top .th { width: 54px; height: 44px; }
+.mc-go { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--c) 14%, transparent); color: var(--c); }
+.mc-go svg.i { width: 15px; height: 15px; stroke-width: 2.6; }
+.mcard > b { font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
+.mcard > small { color: var(--muted); font-size: 12.5px; }
+.mc-tr { display: inline-flex; align-items: center; gap: 3px; margin-top: 8px; font: 700 14px var(--round); color: var(--muted); }
+.mc-tr.up { color: var(--green-ink); } .mc-tr.down { color: var(--red); }
+.mc-tr svg.i { width: 15px; height: 15px; }
+.mc-n { font-size: 12px; color: var(--muted); }
+.pnav { display: flex; align-items: center; padding-top: 4px; margin-bottom: 4px; }
+.pback { display: inline-flex; align-items: center; gap: 2px; height: 38px; padding: 0 14px 0 8px; border-radius: 19px; font: 600 16px var(--font); color: var(--accent); background: rgba(255, 255, 255, .7); border: 1px solid var(--gb); box-shadow: var(--shadow); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+.pback svg.i { width: 20px; height: 20px; stroke-width: 2.4; }
+.ptitle { margin: 10px 4px 14px; }
+.ptitle .eyebrow { color: var(--c); }
+.ptitle .title { font-size: 30px; line-height: 1.1; }
+.ptitle p { margin: 4px 0 0; color: var(--muted); font-size: 14.5px; }
+.pper { margin: 14px 0 12px; }
+.excard { display: block; width: 100%; text-align: left; margin-bottom: 12px; }
+.ex-h { display: grid; grid-template-columns: 50px 1fr auto; gap: 10px; align-items: center; padding: 0 2px 6px; }
+.ex-h .th { width: 50px; height: 42px; }
+.ex-t { min-width: 0; }
+.ex-t b { display: block; font-size: 15px; line-height: 1.22; font-weight: 600; }
+.ex-t small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.ex-r { text-align: right; }
+.ex-r b { display: block; font: 700 22px/1 var(--round); letter-spacing: -.02em; }
+.ex-r b small { font-size: 13px; color: var(--muted); margin-left: 2px; }
+.ex-r em { display: block; font: 600 12.5px var(--font); font-style: normal; color: var(--muted); margin-top: 4px; }
+.ex-r em.up { color: var(--green-ink); } .ex-r em.down { color: var(--red); }
+.ex-f { display: flex; justify-content: space-between; align-items: center; padding: 2px 4px 4px; font-size: 13px; color: var(--muted); }
+.ex-f b { color: var(--text); font: 700 13.5px var(--round); }
+.ex-f > span:last-child { display: inline-flex; align-items: center; gap: 2px; color: var(--c); font-weight: 600; }
+.ex-f svg.i { width: 15px; height: 15px; stroke-width: 2.4; }
+.tile b.up { color: var(--green-ink); } .tile b.down { color: var(--red); }
+main#view.pin { animation: pIn .3s var(--ease) both; }
+main#view.pout { animation: pOut .3s var(--ease) both; }
+@keyframes pIn { from { opacity: 0; transform: translateX(16px); } }
+@keyframes pOut { from { opacity: 0; transform: translateX(-16px); } }
+@media (prefers-reduced-motion: reduce) { main#view.pin, main#view.pout { animation: fadeIn .16s both; } }
+
 </style>
 </head>
 <body>
@@ -1949,7 +1994,7 @@ let DOCS = {};      // todos os documentos (perfis + dados de cada perfil)
 let PID = null;     // perfil aberto
 let CFG = null;     // plano, treinos, corpo do perfil aberto
 let MD = {};        // sessões por mês do perfil aberto
-const UI = { tab: 'hoje', sel: todayISO(), calMonth: todayISO().slice(0, 7), lib: { g: 'all', q: '', e: [], s: [] }, sess: null, open: {}, rest: null, holds: {}, pv: 'cargas', pEx: null, pPer: 'all', bm: 'weight', lock: { mode: 'list', pid: null } };
+const UI = { tab: 'hoje', sel: todayISO(), calMonth: todayISO().slice(0, 7), lib: { g: 'all', q: '', e: [], s: [] }, sess: null, open: {}, rest: null, holds: {}, pv: 'cargas', pEx: null, pG: null, pX: null, pPer: 'all', bm: 'weight', lock: { mode: 'list', pid: null } };
 
 function defaultCfg(name) {
   const W = (n, color, groups, items) => ({ id: 'w' + rid(), name: n, color, groups, items: items.map(([ex, sets, reps]) => ({ ex: slug(ex), sets, reps: String(reps) })) });
@@ -2443,8 +2488,18 @@ function render(anim) {
   hydrate(v); miniBar();
   if (!anim) window.scrollTo(0, y);
 }
+function pNav(y) {
+  // guarda a rolagem de cada nível para o "Voltar" devolver ao mesmo ponto
+  const lvl = UI.pX ? 2 : UI.pG ? 1 : 0, prev = UI.plvl || 0, fwd = lvl > prev;
+  if (fwd && prev === 0) UI.pOy = scrollY;
+  if (fwd && prev === 1) UI.pGy = scrollY;
+  UI.plvl = lvl; buzz(6); render('fade');
+  const v = $('#view'); if (v) { v.classList.remove('pin', 'pout'); void v.offsetWidth; v.classList.add(fwd ? 'pin' : 'pout'); }
+  window.scrollTo(0, fwd ? 0 : (y || 0));
+}
 function go(tab) {
-  if (tab === UI.tab) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+  if (tab === UI.tab) { if (tab === 'evolucao' && (UI.pG || UI.pX)) { UI.pG = UI.pX = null; pNav(0); return; } window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+  if (tab === 'evolucao') { UI.pG = UI.pX = null; UI.plvl = 0; }
   UI.tab = tab;
   $$('.tab').forEach(t => { const on = t.dataset.t === tab; t.classList.toggle('on', on); t.setAttribute('aria-current', on ? 'page' : 'false'); });
   const nav = $('nav.tabs'); if (nav) nav.style.setProperty('--i', TABS.indexOf(tab));
@@ -2650,6 +2705,8 @@ function libList() {
 
 /* ---------- Evolução ---------- */
 function vProg() {
+  if (UI.pv !== 'corpo' && UI.pX && EXI[UI.pX]) return vLoadEx(UI.pX);
+  if (UI.pv !== 'corpo' && UI.pG) return vLoadGroup(UI.pG);
   let h = header('Evolução', 'Seu progresso');
   h += seg2([['cargas', 'Cargas'], ['corpo', 'Corpo']], UI.pv, 'pv');
   h += UI.pv === 'corpo' ? vBody() : vLoads();
@@ -2661,41 +2718,74 @@ function loadIds() {
   return ids;
 }
 const PERIODS = [['1m', '1M', 31], ['3m', '3M', 92], ['6m', '6M', 183], ['all', 'Tudo', 1e5]];
+const GCOL = { peito: '#FF5E1A', costas: '#007AFF', ombros: '#AF52DE', biceps: '#FF2D55', triceps: '#FF9500', pernas: '#34C759', gluteos: '#E5487F', panturrilhas: '#30B0C7', abdomen: '#5856D6' };
+const gCol = g => GCOL[g] || '#FF5E1A';
+// resumo de um exercício: primeiro → atual (todo o histórico)
+function exTrend(id) {
+  const hh = hist(id).filter(x => x.top != null); if (!hh.length) return null;
+  const first = hh[0].top, cur = hh[hh.length - 1].top, d = Math.round((cur - first) * 100) / 100;
+  return { hh, first, cur, d, pct: first ? d / first * 100 : 0, best: Math.max(...hh.map(x => x.top)), last: hh[hh.length - 1].date };
+}
+// exercícios com carga registrada, agrupados pelo músculo principal
+function loadGroups() {
+  const by = {};
+  for (const id of loadIds()) { const g = EXI[id].group; (by[g] = by[g] || []).push(id); }
+  return STRENGTH_GROUPS.filter(g => by[g.id]).map(g => {
+    const tr = by[g.id].map(exTrend).filter(Boolean);
+    const up = tr.filter(t => t.d > 0).length, avg = tr.reduce((a, t) => a + t.pct, 0) / (tr.length || 1);
+    const last = tr.reduce((a, t) => t.last > a ? t.last : a, '');
+    return { g, ids: by[g.id], up, avg, last, n: tr.length };
+  });
+}
+const deltaTxt = (d, pct) => `${d > 0 ? '+' : d < 0 ? '−' : ''}${d ? fmtW(Math.abs(d)) + ' kg' : 'estável'}${d && pct != null ? ` (${pct > 0 ? '+' : ''}${Math.round(pct)}%)` : ''}`;
+const dCls = d => d > 0 ? 'up' : d < 0 ? 'down' : '';
 function vLoads() {
   const t = todayISO(), mk = mKey(t), ms = Object.values((MD[mk] || {}).s || {}).filter(s => s.end);
   let hsum = 0, sets = 0; for (const s of ms) { hsum += durOf(s); sets += sessStats(s).done; }
-  const st = streakInfo();
   let h = `<div class="tiles" style="margin-top:12px"><div class="tile"><b>${cnt(ms.length)}</b><span>treinos em ${MONTHS[parse(t).getMonth()]}</span></div><div class="tile"><b>${cnt(hrs(hsum), 1)}<small>h</small></b><span>treinadas no mês</span></div><div class="tile"><b>${cnt(sets)}</b><span>séries no mês</span></div></div>`;
-  const ids = loadIds();
-  h += `<h2 class="sec">Evolução de carga <small>cada treino</small></h2>`;
-  if (!ids.length) h += `<div class="empty">Registre seu primeiro treino para acompanhar a evolução das cargas.</div>`;
-  else {
-    if (!UI.pEx || !ids.includes(UI.pEx)) UI.pEx = ids[0];
-    const e = EXI[UI.pEx], per = PERIODS.find(p => p[0] === UI.pPer) || PERIODS[3];
-    const from = addDays(t, -per[2]);
-    const hh = hist(UI.pEx).filter(x => x.top != null && x.date >= from);
-    h += `<div class="chips scroll" id="pex">${ids.map(id => `<button class="chip tap ${id === UI.pEx ? 'on' : ''}" data-a="pEx" data-id="${id}">${esc(shortName(EXI[id].name))}</button>`).join('')}</div>`;
-    h += `<div class="chart" id="load-chart">`;
-    if (hh.length) {
-      const cur = hh[hh.length - 1].top, f0 = hh[0].top, d = Math.round((cur - f0) * 100) / 100, pct = f0 ? Math.round(d / f0 * 100) : 0, best = Math.max(...hh.map(x => x.top));
-      h += `<div class="chart-h"><div><div class="eyebrow" style="margin-bottom:6px">${esc(shortName(e.name))}</div><b>${fmtW(cur)}<small>kg</small></b></div><span><b class="${d > 0 ? 'up' : d < 0 ? 'down' : ''}" style="font:700 16px var(--round)">${d > 0 ? '+' : ''}${d ? fmtW(d) + ' kg' : 'estável'}${d ? ` (${pct > 0 ? '+' : ''}${pct}%)` : ''}</b><br>recorde ${fmtW(best)} kg · ${hh.length} ${hh.length === 1 ? 'treino' : 'treinos'}</span></div>`;
-    }
-    h += seg2(PERIODS.map(p => [p[0], p[1]]), per[0], 'pPer', 'sm') + lineChart(hh.map(x => ({ date: x.date, v: x.top })), { unit: 'kg' }) + `</div>`;
-    if (hh.length) h += `<div class="list" style="margin-top:10px"><div class="hist">` + hh.slice().reverse().map((x, n, arr) => { const prev = arr[n + 1]; const dd = prev ? Math.round((x.top - prev.top) * 100) / 100 : 0; return `<div class="hr"><span>${fmtShort(x.date)}</span><span><b>${fmtW(x.top)} kg</b> <span style="color:var(--muted)">· ${x.sets.map(z => `${fmtW(z.w)}×${z.r}`).join(' ')}</span></span><b class="${dd > 0 ? 'up' : dd < 0 ? 'down' : ''}" style="font-size:14px">${dd ? (dd > 0 ? '+' : '−') + fmtW(Math.abs(dd)) : '='}</b></div>`; }).join('') + `</div></div>`;
-  }
+  const gs = loadGroups();
+  h += `<h2 class="sec">Evolução de carga <small>toque no músculo</small></h2>`;
+  if (!gs.length) h += `<div class="empty">Registre seu primeiro treino para acompanhar a evolução das cargas.</div>`;
+  else h += `<div class="mgrid">` + gs.map(x => {
+    const e = EXI[x.ids[0]];
+    return `<button class="mcard tap" data-a="pGroup" data-g="${x.g.id}" style="--c:${gCol(x.g.id)}"><span class="mc-top">${thumb(e)}<span class="mc-go">${I.chevR}</span></span><b>${x.g.name}</b><small>${x.n} ${x.n === 1 ? 'exercício' : 'exercícios'} · ${fmtShort(x.last)}</small><span class="mc-tr ${dCls(x.avg)}">${x.avg > 0.5 ? I.up : ''}${Math.abs(x.avg) < 0.5 ? 'estável' : `${x.avg > 0 ? '+' : '−'}${Math.round(Math.abs(x.avg))}% em média`}</span>${x.n > 1 ? `<span class="mc-n">${x.up} de ${x.n} subiram</span>` : ''}</button>`;
+  }).join('') + `</div>`;
   h += `<h2 class="sec">Treinos por semana <small>últimas 8 semanas</small></h2>` + freqChart();
   const sg = allSuggestions();
   h += `<h2 class="sec">Hora de subir a carga</h2>`;
   h += sg.length ? sg.map(sugRow).join('') : `<div class="empty">Quando você ficar mais de duas semanas com o mesmo peso em um exercício, a sugestão de aumento aparece aqui.</div>`;
-  if (ids.length > 1) {
-    h += `<h2 class="sec">Todas as cargas <small>primeiro → atual</small></h2><div class="list">`;
-    for (const id of ids) {
-      const e = EXI[id], hh = hist(id).filter(x => x.top != null);
-      const first = hh[0].top, cur = hh[hh.length - 1].top, d = Math.round((cur - first) * 100) / 100;
-      h += `<button class="pe tap" data-a="pEx" data-id="${id}" data-top="1">${thumb(e)}<span class="pe-t">${esc(e.name)}<small>${hh.length} ${hh.length === 1 ? 'treino' : 'treinos'} · desde ${fmtShort(hh[0].date)}</small></span><span class="pe-r"><b>${fmtW(cur)} kg</b><small class="${d > 0 ? 'up' : d < 0 ? 'down' : ''}">${d > 0 ? '+' : ''}${d ? fmtW(d) + ' kg' : 'estável'}</small>${spark(hh.map(x => x.top))}</span></button>`;
-    }
-    h += '</div>';
+  return h;
+}
+function pBackBar(label, title, sub, color) {
+  return `<div class="pnav"><button class="pback tap" data-a="pBack">${I.chevL}<span>${esc(label)}</span></button></div><div class="ptitle" style="--c:${color}"><div class="eyebrow">Evolução de carga</div><h1 class="title">${esc(title)}</h1>${sub ? `<p>${sub}</p>` : ''}</div>`;
+}
+function perSeg() { const per = PERIODS.find(p => p[0] === UI.pPer) || PERIODS[3]; return { per, html: seg2(PERIODS.map(p => [p[0], p[1]]), per[0], 'pPer', 'sm') }; }
+function vLoadGroup(gid) {
+  const x = loadGroups().find(z => z.g.id === gid);
+  if (!x) { UI.pG = null; return vProg(); }
+  const col = gCol(gid), { per, html } = perSeg(), from = addDays(todayISO(), -per[2]);
+  let h = pBackBar('Evolução', x.g.name, `${x.n} ${x.n === 1 ? 'exercício' : 'exercícios'} com carga registrada`, col);
+  const stable = x.n - x.up - x.ids.map(exTrend).filter(t => t && t.d < 0).length;
+  h += `<div class="tiles"><div class="tile"><b class="up">${x.up}</b><span>${x.up === 1 ? 'exercício subiu' : 'exercícios subiram'}</span></div><div class="tile"><b>${stable}</b><span>${stable === 1 ? 'estável' : 'estáveis'}</span></div><div class="tile"><b class="${dCls(x.avg)}">${Math.abs(x.avg) < 0.5 ? '0' : (x.avg > 0 ? '+' : '−') + Math.round(Math.abs(x.avg))}<small>%</small></b><span>média desde o início</span></div></div>`;
+  h += `<div class="pper">${html}</div>`;
+  for (const id of x.ids) {
+    const e = EXI[id], t = exTrend(id), hh = t.hh.filter(z => z.date >= from);
+    const pd = hh.length ? Math.round((hh[hh.length - 1].top - hh[0].top) * 100) / 100 : 0, pp = hh.length && hh[0].top ? pd / hh[0].top * 100 : 0;
+    h += `<button class="chart excard tap" data-a="pExOpen" data-id="${id}" style="--c:${col}"><span class="ex-h">${thumb(e)}<span class="ex-t"><b>${esc(e.name)}</b><small>${EQUIP[e.eq].name} · ${t.hh.length} ${t.hh.length === 1 ? 'treino' : 'treinos'}</small></span><span class="ex-r"><b>${fmtW(t.cur)}<small>kg</small></b><em class="${dCls(pd)}">${hh.length > 1 ? deltaTxt(pd, pp) : per[0] === 'all' ? 'primeiro registro' : 'no período'}</em></span></span>${lineChart(hh.map(z => ({ date: z.date, v: z.top })), { unit: 'kg', color: col })}<span class="ex-f"><span>recorde <b>${fmtW(t.best)} kg</b></span><span>Ver histórico ${I.chevR}</span></span></button>`;
   }
+  return h;
+}
+function vLoadEx(id) {
+  const e = EXI[id], t = exTrend(id);
+  if (!t) { UI.pX = null; return vProg(); }
+  const gid = e.group, col = gCol(gid), { per, html } = perSeg(), from = addDays(todayISO(), -per[2]);
+  const hh = t.hh.filter(z => z.date >= from), back = UI.pG ? (GROUPS.find(g => g.id === UI.pG) || {}).name || 'Voltar' : 'Evolução';
+  let h = pBackBar(back, e.name.replace(/\s*\(.*?\)\s*/g, ' ').trim(), `${groupName(gid)} · ${EQUIP[e.eq].name}`, col);
+  h += `<div class="chart" style="--c:${col}">`;
+  if (hh.length) { const d = Math.round((hh[hh.length - 1].top - hh[0].top) * 100) / 100, pct = hh[0].top ? d / hh[0].top * 100 : 0; h += `<div class="chart-h"><div><div class="eyebrow" style="margin-bottom:6px">Carga atual</div><b>${fmtW(hh[hh.length - 1].top)}<small>kg</small></b></div><span><b class="${dCls(d)}" style="font:700 16px var(--round)">${hh.length > 1 ? deltaTxt(d, pct) : 'primeiro registro'}</b><br>recorde ${fmtW(t.best)} kg · ${hh.length} ${hh.length === 1 ? 'treino' : 'treinos'}</span></div>`; }
+  h += html + lineChart(hh.map(z => ({ date: z.date, v: z.top })), { unit: 'kg', color: col }) + `</div>`;
+  if (hh.length) h += `<h2 class="sec">Histórico <small>cada treino</small></h2><div class="list"><div class="hist">` + hh.slice().reverse().map((x, n, arr) => { const prev = arr[n + 1]; const dd = prev ? Math.round((x.top - prev.top) * 100) / 100 : 0; return `<div class="hr"><span>${fmtShort(x.date)}</span><span><b>${fmtW(x.top)} kg</b> <span style="color:var(--muted)">· ${x.sets.map(z => `${fmtW(z.w)}×${z.r}`).join(' ')}</span></span><b class="${dCls(dd)}" style="font-size:14px">${dd ? (dd > 0 ? '+' : '−') + fmtW(Math.abs(dd)) : '='}</b></div>`; }).join('') + `</div></div>`;
+  h += `<button class="btn block tap" data-a="exInfo" data-id="${id}" style="margin-top:14px">${I.info} Como fazer</button>`;
   return h;
 }
 function vBody() {
@@ -2741,7 +2831,7 @@ function lineChart(pts, { unit = '', color = '#FF5E1A', dec = 1 } = {}) {
   xy.forEach((p, i) => { const last = i === xy.length - 1; s += `<circle class="pt ${last ? 'last' : ''}" cx="${p[0]}" cy="${p[1]}" r="${last ? 5 : xy.length > 30 ? 2.2 : 3.4}"><title>${fmtShort(pts[i].date)}: ${fmtN(pts[i].v, dec)} ${unit}</title></circle>`; });
   const lx = xy[xy.length - 1];
   s += `<text class="lb" x="${Math.min(lx[0], W - R)}" y="${lx[1] - 11}" text-anchor="end">${fmtN(v[v.length - 1], dec)} ${unit}</text>`;
-  if (iMax !== v.length - 1 && xy.length > 2) s += `<text class="lb" x="${xy[iMax][0]}" y="${xy[iMax][1] - 10}" text-anchor="middle" style="fill:var(--muted)">${fmtN(mx, dec)}</text>`;
+  if (mx !== v[v.length - 1] && xy.length > 2) s += `<text class="lb" x="${xy[iMax][0]}" y="${xy[iMax][1] - 10}" text-anchor="middle" style="fill:var(--muted)">${fmtN(mx, dec)}</text>`;
   s += `<text class="ax" x="${L}" y="${H - 6}">${fmtShort(pts[0].date)}</text>${pts.length > 1 ? `<text class="ax" x="${W - R}" y="${H - 6}" text-anchor="end">${fmtShort(pts[pts.length - 1].date)}</text>` : ''}`;
   return s + '</svg>';
 }
@@ -3266,8 +3356,10 @@ const ACT = {
   confirmOk: () => { const o = topSheet('confirm'); const f = o && o.onOk; closeSheet(o); if (f) f(); },
   addToCur: t => { const s = getSession(todayISO()); if (!s) return; addToSession(s, t.dataset.id); putSession(s); closeSheet(); toast('Adicionado ao treino de hoje'); if (UI.sess === s.date) renderSession(); else render(); },
   pv: t => { UI.pv = t.dataset.v; const sg = t.closest('.seg2'); if (sg) sg.style.setProperty('--i', UI.pv === 'corpo' ? 1 : 0); buzz(6); render('fade'); },
-  pEx: t => { UI.pEx = t.dataset.id; render(); if (t.dataset.top) { const c = $('#pex'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'start' }); } buzz(5); const ch = $(`#pex [data-id="${UI.pEx}"]`); if (ch) ch.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }); },
-  pPer: t => { UI.pPer = t.dataset.v; const sg = t.closest('.seg2'); if (sg) sg.style.setProperty('--i', PERIODS.findIndex(p => p[0] === UI.pPer)); buzz(5); render(); },
+  pGroup: t => { UI.pG = t.dataset.g; UI.pX = null; pNav(); },
+  pExOpen: t => { UI.pX = t.dataset.id; pNav(); },
+  pBack: () => { if (UI.pX) { UI.pX = null; pNav(UI.pGy); } else { UI.pG = null; pNav(UI.pOy); } },
+  pPer: t => { UI.pPer = t.dataset.v; const sg = t.closest('.seg2'); if (sg) sg.style.setProperty('--i', PERIODS.findIndex(p => p[0] === UI.pPer)); buzz(5); const y = scrollY; render(); window.scrollTo(0, y); },
   bm: t => { UI.bm = t.dataset.k; render(); buzz(5); },
   bioNew: () => openBio(null),
   bioEdit: t => openBio(t.dataset.id),
