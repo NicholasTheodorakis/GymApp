@@ -222,6 +222,8 @@ nav.tabs { position: fixed; left: 50%; bottom: calc(10px + var(--sab)); transfor
 .rest-hero svg.i { width: 52px; height: 52px; color: var(--rest); stroke-width: 1.5; }
 .rest-hero h3 { font: 700 26px var(--title); letter-spacing: -.02em; margin: 10px 0 4px; }
 .rest-hero p { color: var(--muted); margin: 0 0 16px; font-size: 15px; max-width: 30ch; }
+.rest-hero.first-w svg.i { color: var(--accent); stroke-width: 1.6; }
+.sp-ic svg.i { width: 20px; height: 20px; color: var(--accent); }
 .quick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .qbtn { display: flex; align-items: center; gap: 10px; padding: 14px; border-radius: 20px; background: var(--glass2); border: 1px solid var(--gb); text-align: left; font-weight: 600; font-size: 15px; box-shadow: var(--shadow); }
 .qbtn svg.i { color: var(--c); }
@@ -2264,14 +2266,26 @@ let CFG = null;     // plano, treinos, corpo do perfil aberto
 let MD = {};        // sessões por mês do perfil aberto
 const UI = { tab: 'hoje', sel: todayISO(), calMonth: todayISO().slice(0, 7), lib: { g: 'all', q: '', e: [], s: [] }, sess: null, open: {}, rest: null, holds: {}, pv: 'cargas', pEx: null, pG: null, pX: null, pPer: 'all', bm: 'weight', lock: { mode: 'list', pid: null } };
 
+// treinos de exemplo das versões antigas: servem só para reconhecê-los e retirá-los dos perfis (cada usuário monta os seus)
+const OLD_SEED = [
+  ['Peito e tríceps', [['Supino reto com barra', 4, '8-10'], ['Supino inclinado com halteres', 3, '10'], ['Crucifixo na máquina (peck deck / voador)', 3, '12'], ['Crossover na polia alta (ênfase no peitoral inferior)', 3, '12'], ['Tríceps na polia alta com corda', 3, '12'], ['Tríceps francês bilateral com halter', 3, '10']]],
+  ['Costas e bíceps', [['Puxada alta frontal na polia', 4, '10'], ['Remada baixa sentada na polia', 3, '10'], ['Remada unilateral com halter', 3, '10'], ['Face pull na polia alta', 3, '15'], ['Rosca direta com barra W montada', 3, '10'], ['Rosca martelo com halteres', 3, '12']]],
+  ['Pernas', [['Agachamento livre com barra', 4, '8'], ['Leg press 45°', 3, '12'], ['Cadeira extensora', 3, '12'], ['Mesa flexora deitada', 3, '12'], ['Stiff com halteres', 3, '10'], ['Panturrilha em pé na máquina', 4, '15']]],
+  ['Ombros e abdômen', [['Desenvolvimento com halteres sentado', 4, '10'], ['Elevação lateral com halteres', 4, '12'], ['Voador inverso na máquina', 3, '12'], ['Encolhimento com halteres', 3, '12'], ['Abdominal na polia alta (cable crunch)', 3, '15'], ['Prancha frontal', 3, '45']]]
+];
 function defaultCfg(name) {
-  const W = (n, color, groups, items) => ({ id: 'w' + rid(), name: n, color, groups, items: items.map(([ex, sets, reps]) => ({ ex: slug(ex), sets, reps: String(reps) })) });
-  const a = W('Peito e tríceps', '#FF3B30', ['peito', 'triceps'], [['Supino reto com barra', 4, '8-10'], ['Supino inclinado com halteres', 3, '10'], ['Crucifixo na máquina (peck deck / voador)', 3, '12'], ['Crossover na polia alta (ênfase no peitoral inferior)', 3, '12'], ['Tríceps na polia alta com corda', 3, '12'], ['Tríceps francês bilateral com halter', 3, '10']]);
-  const b = W('Costas e bíceps', '#007AFF', ['costas', 'biceps'], [['Puxada alta frontal na polia', 4, '10'], ['Remada baixa sentada na polia', 3, '10'], ['Remada unilateral com halter', 3, '10'], ['Face pull na polia alta', 3, '15'], ['Rosca direta com barra W montada', 3, '10'], ['Rosca martelo com halteres', 3, '12']]);
-  const c = W('Pernas', '#FFCC00', ['pernas', 'gluteos', 'panturrilhas'], [['Agachamento livre com barra', 4, '8'], ['Leg press 45°', 3, '12'], ['Cadeira extensora', 3, '12'], ['Mesa flexora deitada', 3, '12'], ['Stiff com halteres', 3, '10'], ['Panturrilha em pé na máquina', 4, '15']]);
-  const d = W('Ombros e abdômen', '#34C759', ['ombros', 'abdomen'], [['Desenvolvimento com halteres sentado', 4, '10'], ['Elevação lateral com halteres', 4, '12'], ['Voador inverso na máquina', 3, '12'], ['Encolhimento com halteres', 3, '12'], ['Abdominal na polia alta (cable crunch)', 3, '15'], ['Prancha frontal', 3, '45']]);
-  [a, b, c, d].forEach(w => { w.gym = GYM0; });
-  return { v: 3, u: 0, name: name || '', created: todayISO(), gyms: [{ id: GYM0, name: 'Minha academia' }], gym: GYM0, dayGym: {}, workouts: [a, b, c, d], week: { 0: 'rest', 1: a.id, 2: b.id, 3: c.id, 4: 'rest', 5: d.id, 6: 'rest' }, favSports: ['tenis', 'futebol', 'corrida'], overrides: {}, settings: { rest: 90, restEx: 120 }, body: [], height: null };
+  return { v: 3, u: 0, name: name || '', created: todayISO(), seedOff: 1, gyms: [{ id: GYM0, name: 'Minha academia' }], gym: GYM0, dayGym: {}, workouts: [], week: { 0: 'free', 1: 'free', 2: 'free', 3: 'free', 4: 'free', 5: 'free', 6: 'free' }, favSports: ['tenis', 'futebol', 'corrida'], overrides: {}, settings: { rest: 90, restEx: 120 }, body: [], height: null };
+}
+// retira os treinos de exemplo que nunca foram mexidos nem treinados (os que o usuário usou ou editou ficam)
+function dropSeed() {
+  const used = new Set(sessions().map(s => s.wid).filter(Boolean));
+  const same = (w, [n, its]) => w.name === n && (w.items || []).length === its.length && w.items.every((it, i) => it.ex === slug(its[i][0]) && +it.sets === its[i][1] && String(it.reps) === String(its[i][2]));
+  const drop = new Set(CFG.workouts.filter(w => !used.has(w.id) && OLD_SEED.some(d => same(w, d))).map(w => w.id));
+  if (!drop.size) return 0;
+  CFG.workouts = CFG.workouts.filter(w => !drop.has(w.id));
+  for (const k in CFG.week) if (drop.has(CFG.week[k])) CFG.week[k] = 'free';
+  for (const k in CFG.overrides) if (drop.has(CFG.overrides[k])) delete CFG.overrides[k];
+  return drop.size;
 }
 function fixCfg(c) {
   c = c || defaultCfg('');
@@ -2561,7 +2575,9 @@ const Store = {
     this.busy = false; this.set(this.db ? (failed ? 'saving' : 'cloud') : 'local');
     if (!failed && this.dirty.size && this.db) this.flush();
   },
-  async connect() {
+  // a limpeza dos treinos de exemplo espera a nuvem responder, para não apagar um treino que só foi usado em outro aparelho
+  async connect() { try { await this.pull(); } finally { this.ready = true; if (PID && CFG && !CFG.seedOff) { loadProfile(PID); render(); } } },
+  async pull() {
     for (let n = 0; n < 12 && !(window.claude && typeof window.claude.use === 'function'); n++) await new Promise(r => setTimeout(r, 250));
     const cl = window.claude; if (!cl || typeof cl.use !== 'function') return;
     try {
@@ -2638,6 +2654,7 @@ function loadProfile(pid) {
   let dirty = fresh;
   if (!CFG.created) { const ss = sessions(); CFG.created = ss.length ? ss[0].date : todayISO(); dirty = true; }
   if (p && CFG.name !== p.name) { CFG.name = p.name; dirty = true; }
+  if (!CFG.seedOff && Store.ready) { CFG.seedOff = 1; if (dropSeed()) bump(); dirty = true; }
   if (dirty) touch('config');
 }
 const logoHTML = () => `<div class="logo"><div class="logo-tile"><svg viewBox="0 0 24 24" aria-hidden="true"><g class="db"><path pathLength="1" d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11"/></g></svg></div><div class="wordmark">Gym<span>App</span></div><div class="tagline">Seu diário de treino</div></div>`;
@@ -3015,6 +3032,12 @@ function dayCard(ds) {
     return `<section class="daycard" style="--c:${w.color}"><div class="dc-in"><div class="dc-top">${tag}<span class="dc-meta">${w.items.length} exercícios · ~${fmtHm(estMin(w))}</span></div>${gymPick(ds)}<h2 class="dc-title">${esc(w.name)}</h2><div class="chips">${groups}</div><div class="dc-list">${list || '<div class="empty">Esse treino ainda não tem exercícios.</div>'}</div><div class="dc-actions">${act}<button class="btn tap" data-a="dayPlan" data-d="${ds}" aria-label="Trocar treino do dia" style="padding:0 16px">${I.swap}</button></div></div></section>`;
   }
   const rest = p === 'rest';
+  if (!rest && !gymWorkouts(g).length) {
+    // ainda não há treinos (nesta academia): convida a montar o primeiro
+    const none = !CFG.workouts.length;
+    const act = `<button class="btn primary tap" style="flex:1" data-a="gymWorkouts" data-g="${g}">${I.plus} Criar treino</button>${past ? `<button class="btn tap" data-a="startFree" data-d="${ds}">Livre</button>` : `<button class="btn tap" data-a="dayPlan" data-d="${ds}" aria-label="Mudar plano do dia" style="padding:0 16px">${I.swap}</button>`}`;
+    return `<section class="daycard" style="--c:var(--accent)"><div class="dc-in"><div class="dc-top">${tag}</div>${past ? gymPick(ds) : ''}<div class="rest-hero first-w">${I.dumb}<h3>${none ? 'Monte seu primeiro treino' : `Nenhum treino em ${esc(gymName(g))}`}</h3><p>${none ? 'Crie seus treinos com os exercícios que você faz. Depois, na Agenda, coloque cada um num dia da semana.' : 'Monte os treinos com os aparelhos e pesos desta academia.'}</p></div><div class="dc-actions">${act}</div></div></section>`;
+  }
   const quick = past ? `<div class="quick"><button class="qbtn tap" style="--c:var(--cardio)" data-a="startKind" data-d="${ds}" data-k="cardio">${I.pulse} Só aeróbico</button><button class="qbtn tap" style="--c:var(--stretch)" data-a="startKind" data-d="${ds}" data-k="stretch">${I.leaf} Só alongar</button></div><div style="height:10px"></div><div class="dc-actions"><button class="btn tap" style="flex:1" data-a="dayPlan" data-d="${ds}">${rest ? 'Treinar mesmo assim' : 'Escolher treino'}</button><button class="btn tap" data-a="startFree" data-d="${ds}">Livre</button></div>` : `<div class="dc-actions"><button class="btn tap" style="flex:1" data-a="dayPlan" data-d="${ds}">Mudar plano</button></div>`;
   return `<section class="daycard" style="--c:${rest ? '#5856D6' : '#8E8E93'}"><div class="dc-in"><div class="dc-top">${tag}</div>${past ? gymPick(ds) : ''}<div class="rest-hero">${rest ? I.moon : I.cal}<h3>${rest ? 'Descanso' : 'Sem treino planejado'}</h3><p>${rest ? 'Descansar mantém seu foguinho aceso. Se quiser, faça um aeróbico leve, alongue ou pratique um esporte.' : 'Escolha um treino, monte um livre, faça só aeróbico e alongamento ou registre um esporte.'}</p></div>${quick}</div></section>`;
 }
@@ -3072,7 +3095,7 @@ function vWorkouts() {
   const g = gymById(UI.wGym), list = gymWorkouts(g.id);
   h += `<div class="chips scroll gymbar" id="gymbar">${gyms().map(x => `<button class="chip tap ${x.id === g.id ? 'on' : ''}" data-a="wGym" data-g="${x.id}">${I.pin}${esc(x.name)}</button>`).join('')}<button class="chip tap add" data-a="gymNew">${I.plus} Academia</button></div>`;
   h += `<div class="gymhead"><div><b>${esc(g.name)}</b><span>${list.length} ${list.length === 1 ? 'treino' : 'treinos'}${multiGym() ? ' · cargas registradas só desta academia' : ''}</span></div><button class="btn sm tap" data-a="gymEdit" data-g="${g.id}">${I.edit} Editar</button></div>`;
-  if (!list.length) h += `<div class="empty">Ainda não há treinos em ${esc(g.name)}. Monte os treinos com os aparelhos e pesos desta academia.</div>`;
+  if (!list.length) h += CFG.workouts.length ? `<div class="empty">Ainda não há treinos em ${esc(g.name)}. Monte os treinos com os aparelhos e pesos desta academia.</div>` : `<div class="empty">Você ainda não tem treinos. Crie o primeiro com os exercícios que você faz, na ordem em que faz.</div>`;
   for (const w of list) {
     const items = w.items.filter(it => EXI[it.ex]);
     const th = items.slice(0, 5).map(it => thumb(EXI[it.ex])).join('') + (items.length > 5 ? `<span class="more">+${items.length - 5}</span>` : '');
@@ -3756,6 +3779,7 @@ function planOptions(cur, act, extra, firstGym) {
   const row = (v, label, c, sub = '', ic) => `<button class="opt tap ${cur === v ? 'on' : ''}" data-a="${act}" data-v="${v}" ${extra}>${ic ? `<span class="sp-ic">${ic}</span>` : `<i class="dot" style="--c:${c}"></i>`}<span>${label}${sub ? `<small>${sub}</small>` : ''}</span><span class="rd"></span></button>`;
   const gl = gyms().slice().sort((a, b) => (b.id === firstGym) - (a.id === firstGym));
   let h = '';
+  if (!CFG.workouts.length) h += `<div class="lib-sub">Treinos</div><div class="list"><button class="opt tap" data-a="planNewW" data-g="${firstGym || CFG.gym}"><span class="sp-ic">${I.plus}</span><span>Criar treino<small>você ainda não tem treinos</small></span>${I.chevR.replace('class="i"', 'class="i" style="width:16px;color:var(--dim)"')}</button></div>`;
   for (const g of gl) { const ws = gymWorkouts(g.id); if (!ws.length) continue; h += `<div class="lib-sub gym-sub">${multiGym() ? I.pin + esc(g.name) : 'Treinos'}</div>` + '<div class="list">' + ws.map(w => row(w.id, esc(w.name), w.color, `${w.items.length} exercícios`)).join('') + '</div>'; }
   const sp = planSport(cur), favs = favSports(), open = !!sp;
   let sub = favs.map(k => row('sp:' + k, SPI[k].n, '', 'favorito', SPI[k].e)).join('');
@@ -3946,6 +3970,7 @@ const ACT = {
   // academias
   dayGym: t => { const ds = t.dataset.d, g = t.dataset.g; if (dayGym(ds) === g) return; setDayGym(ds, g); buzz(6); const o = topSheet('day'); if (o) setSheetBody(o, dayBody(ds)); render(); },
   pickDayW: t => { const ds = t.dataset.d, w = wById(t.dataset.v); if (!w) return; CFG.overrides[ds] = w.id; CFG.dayGym[ds] = w.gym; saveCfg(); buzz(8); render(); },
+  planNewW: t => { while (SHEETS.length) closeSheet(); ACT.gymWorkouts(t); },
   gymWorkouts: t => { UI.wGym = t.dataset.g; go('treinos'); setTimeout(() => openEditor(null), 250); },
   wGym: t => { if (UI.wGym === t.dataset.g) return; UI.wGym = t.dataset.g; buzz(5); render('fade'); },
   gymNew: () => openGym(null),
