@@ -3068,14 +3068,14 @@ function whenLabel(nx, ds) { return nx ? (nx === addDays(todayISO(), 1) ? 'amanh
 const dayWord = ds => { const t = todayISO(); return ds === t ? 'hoje' : ds === addDays(t, 1) ? 'amanhã' : ds === addDays(t, -1) ? 'ontem' : WD[parse(ds).getDay()].toLowerCase() + (Math.abs(diffDays(ds, t)) > 6 ? ' (' + fmtShort(ds) + ')' : ''); };
 // trocar o treino de um dia: pergunta se muda só aquele dia ou se empurra a grade
 function askPlanMode(ds, v) {
-  const prev = wById(planFor(ds)); if (!prev) return;
-  const keep = { o: CFG.overrides[ds], sh: CFG.shifts };
+  const gw = wById(naturalPlan(ds, true)); if (!gw) return; // o treino que a grade coloca neste dia
+  const cur = planFor(ds), keep = { o: CFG.overrides[ds], sh: CFG.shifts };
   CFG.overrides[ds] = v; CFG.shifts = [...(CFG.shifts || []).filter(x => x !== ds), ds].sort(); bump();
-  const nx = nextPlanned(ds, prev.id);
+  const nx = nextPlanned(ds, gw.id);
   if (keep.o === undefined) delete CFG.overrides[ds]; else CFG.overrides[ds] = keep.o; CFG.shifts = keep.sh; bump();
-  const nm = esc(prev.name), chev = I.chevR.replace('class="i"', 'class="i" style="width:16px;color:var(--dim)"');
-  const body = `<div class="pm-from"><span><i class="dot" style="--c:${prev.color}"></i>${nm}</span>${I.chevR}<span>${planIcon(v)}${esc(planLabel(v))}</span></div><div class="list">
-  <button class="opt tap pm-opt" data-a="planMode" data-m="day"><span class="sp-ic">${I.cal}</span><span>Só neste dia<small>${nm} fica de fora desta vez. Os próximos dias continuam como estão.</small></span>${chev}</button>
+  const nm = esc(gw.name), chev = I.chevR.replace('class="i"', 'class="i" style="width:16px;color:var(--dim)"');
+  const body = `<div class="pm-from"><span>${planIcon(cur)}${esc(planLabel(cur))}</span>${I.chevR}<span>${planIcon(v)}${esc(planLabel(v))}</span></div><div class="list">
+  <button class="opt tap pm-opt" data-a="planMode" data-m="day"><span class="sp-ic">${I.cal}</span><span>Só neste dia<small>${nm} fica de fora desta vez. Os próximos dias seguem a grade normal.</small></span>${chev}</button>
   <button class="opt tap pm-opt" data-a="planMode" data-m="push"><span class="sp-ic">${I.skip}</span><span>Empurrar a grade<small>${nm} vai para ${whenLabel(nx, ds)} e os próximos treinos andam um dia. Descanso e esportes ficam no lugar.</small></span>${chev}</button></div>`;
   const o = openSheet({ title: 'Como trocar o treino?', sub: `${dayTag(ds)} · escolha o que acontece com a grade`, body, foot: '<button class="btn tap" data-a="closeSheet">Cancelar</button>', key: 'pmode' });
   o.ds = ds; o.v = v; buzz(6);
@@ -4035,10 +4035,10 @@ const ACT = {
     const nat = naturalPlan(ds, true), slot = !!wById(basePlan(ds)), has = CFG.overrides[ds] !== undefined;
     let mode = t.dataset.mode;
     if (!mode) {
-      if (!slot || v === nat) mode = 'push'; // nada a empurrar, ou voltando ao plano
-      else if (has) mode = (CFG.shifts || []).includes(ds) ? 'push' : 'day'; // o dia já foi trocado: mantém a escolha feita
-      else { askPlanMode(ds, v); return; }
+      if (!slot || v === nat || !wById(nat)) mode = 'push'; // nada a empurrar, ou voltando ao plano
+      else { askPlanMode(ds, v); return; } // pergunta sempre, mesmo se o dia já tinha sido trocado antes
     }
+    const wasPushed = (CFG.shifts || []).includes(ds);
     const pw = wById(v), snap = JSON.stringify({ o: CFG.overrides[ds], g: CFG.dayGym[ds], sh: CFG.shifts || [] });
     CFG.shifts = (CFG.shifts || []).filter(x => x !== ds);
     if (v === nat) delete CFG.overrides[ds]; else { CFG.overrides[ds] = v; if (slot && mode === 'push') CFG.shifts.push(ds); }
@@ -4049,9 +4049,9 @@ const ACT = {
       const z = JSON.parse(snap); if (z.o === undefined) delete CFG.overrides[ds]; else CFG.overrides[ds] = z.o; if (z.g === undefined) delete CFG.dayGym[ds]; else CFG.dayGym[ds] = z.g; CFG.shifts = z.sh;
       saveCfg(); bump(); const o2 = topSheet('day'); if (o2) setSheetBody(o2, dayBody(ds)); render(); buzz(6);
     } };
-    const moved = wById(prev), pushed = slot && v !== nat && CFG.shifts.includes(ds);
-    if (moved && pushed) { const nx = nextPlanned(ds, moved.id); toast(`${moved.name} foi para ${whenLabel(nx, ds)}. Os próximos treinos andaram um dia.`, undo); }
-    else if (moved && slot && v !== nat && !has) toast(`Só ${dayWord(ds)} mudou. O resto da grade continua igual.`, undo);
+    const gw = wById(nat), pushed = slot && v !== nat && CFG.shifts.includes(ds);
+    if (gw && pushed) { const nx = nextPlanned(ds, gw.id); toast(`${gw.name} foi para ${whenLabel(nx, ds)}. Os próximos treinos andaram um dia.`, undo); }
+    else if (gw && slot && v !== nat) toast(wasPushed ? `Só ${dayWord(ds)} mudou. Os próximos treinos voltaram para o lugar.` : `Só ${dayWord(ds)} mudou. O resto da grade continua igual.`, undo);
   },
   planMode: t => { const o = topSheet('pmode'); if (!o) return; const { ds, v } = o; closeSheet(o); ACT.setPlan({ dataset: { d: ds, v, mode: t.dataset.m } }); },
   clearPlan: t => { const ds = t.dataset.d; delete CFG.overrides[ds]; CFG.shifts = (CFG.shifts || []).filter(x => x !== ds); saveCfg(); bump(); const o = topSheet('day'); if (o) setSheetBody(o, dayBody(ds)); render(); toast(weekOn() ? 'O dia voltou ao plano e os treinos voltaram para o lugar' : 'Plano do dia removido'); },
