@@ -2393,16 +2393,17 @@ function basePlan(date) {
 // início do plano semanal que vale na data: empurrões anteriores a ele não contam mais
 function weekEpoch(date) { let ep = ''; for (const e of (CFG.weekLog || [])) if (e.until <= date && e.until > ep) ep = e.until; return ep; }
 /* Empurrar treinos: quando um dia de treino vira outro treino, esporte ou descanso, o treino que saiu
-   vai para o próximo dia de treino e todos os seguintes andam uma casa. Descanso e esportes do plano
-   semanal ficam no lugar. Cada empurrão é uma data em CFG.shifts; um dia de treino recebe o treino
-   do dia de treino que fica N casas antes dele, sendo N o número de empurrões anteriores. */
+   vai para o próximo dia que não é descanso e todos os seguintes andam uma casa. Só descanso e esportes
+   do plano semanal ficam no lugar: dias "sem plano" também recebem treino. Cada empurrão é uma data em
+   CFG.shifts; um dia que anda recebe o que estava N dias que andam antes dele, sendo N o número de empurrões. */
+const movable = p => p === 'free' || !!wById(p);
 function naturalPlan(date, exclSelf) {
-  const b = basePlan(date); if (!wById(b)) return b;
+  const b = basePlan(date); if (!movable(b)) return b;
   const ep = weekEpoch(date); let n = 0;
   for (const x of (CFG.shifts || [])) if (x >= ep && (x < date || (!exclSelf && x === date && CFG.overrides[date] === undefined))) n++;
   if (!n) return b;
   let d = date, guard = 0;
-  while (n > 0 && guard++ < 800) { d = addDays(d, -1); if (wById(basePlan(d))) n--; }
+  while (n > 0 && guard++ < 800) { d = addDays(d, -1); if (movable(basePlan(d))) n--; }
   return n ? b : basePlan(d);
 }
 function planFor(date) {
@@ -3882,7 +3883,7 @@ function dayBody(ds) {
   if (!s && ds <= t) h += sportRow(ds).replace('class="sport-add', 'style="margin:0 0 14px" class="sport-add').replace('class="sport-row"', 'class="sport-row" style="margin:0 0 14px"');
   if (s) h += sportRow(ds).replace('class="sport-add', 'style="margin:-4px 0 14px" class="sport-add').replace('class="sport-row"', 'class="sport-row" style="margin:-4px 0 14px"');
   h += `<div class="lib-sub" style="margin-top:2px">Plano do dia</div>` + planOptions(p, 'setPlan', `data-d="${ds}"`, dayGym(ds));
-  const nat = naturalPlan(ds, true), shifted = (CFG.shifts || []).includes(ds), slot = !!wById(basePlan(ds));
+  const nat = naturalPlan(ds, true), shifted = (CFG.shifts || []).includes(ds), slot = movable(basePlan(ds)) && !!wById(nat);
   if (!weekOn()) h += has ? `<p style="color:var(--muted);font-size:14px;margin:12px 4px">Escolhido só para este dia · <button class="link" data-a="clearPlan" data-d="${ds}">tirar plano</button></p>` : '';
   else h += `<p style="color:var(--muted);font-size:14px;margin:12px 4px">${shifted ? `Este dia empurrou ${esc(planLabel(nat))} e os próximos treinos um dia para frente` : has && slot && wById(nat) ? `Só este dia mudou. Pelo plano seria <b style="color:var(--text)">${esc(planLabel(nat))}</b>, e a grade seguiu igual` : `Pelo plano, este dia seria: <b style="color:var(--text)">${esc(planLabel(nat))}</b>`}${has ? ` · <button class="link" data-a="clearPlan" data-d="${ds}">${shifted ? 'desfazer' : 'voltar ao plano'}</button>` : ''}</p>`;
   if (!has && slot) h += `<p class="hint" style="margin:-4px 4px 12px">Ao trocar o treino deste dia, você escolhe se muda só ele ou se os próximos treinos andam um dia.</p>`;
@@ -4032,10 +4033,11 @@ const ACT = {
   setPlan: t => {
     const ds = t.dataset.d, v = t.dataset.v, prev = planFor(ds);
     if (v === prev) return;
-    const nat = naturalPlan(ds, true), slot = !!wById(basePlan(ds)), has = CFG.overrides[ds] !== undefined;
+    // só há o que empurrar quando a grade põe um treino neste dia
+    const nat = naturalPlan(ds, true), slot = movable(basePlan(ds)) && !!wById(nat), has = CFG.overrides[ds] !== undefined;
     let mode = t.dataset.mode;
     if (!mode) {
-      if (!slot || v === nat || !wById(nat)) mode = 'push'; // nada a empurrar, ou voltando ao plano
+      if (!slot || v === nat) mode = 'day'; // nada a empurrar, ou voltando ao plano
       else { askPlanMode(ds, v); return; } // pergunta sempre, mesmo se o dia já tinha sido trocado antes
     }
     const wasPushed = (CFG.shifts || []).includes(ds);
