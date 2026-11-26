@@ -571,6 +571,7 @@ textarea.inp { height: 110px; padding: 10px 14px; font: 13px/1.4 ui-monospace, m
 .prs { display: grid; gap: 6px; margin-top: 14px; }
 .toast { position: fixed; left: 50%; top: calc(12px + var(--sat)); transform: translate(-50%, -160%) scale(.9); z-index: 120; background: rgba(28, 28, 30, .88); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); color: #fff; padding: 12px 18px; border-radius: 24px; font-weight: 500; font-size: 15px; box-shadow: 0 14px 40px -10px rgba(0, 0, 0, .4); transition: transform .6s var(--spring); max-width: calc(100% - 32px); text-align: center; }
 .toast.on { transform: translate(-50%, 0) scale(1); }
+.toast { touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
 .confetti { position: fixed; top: 38%; left: 50%; width: 9px; height: 14px; border-radius: 3px; z-index: 125; pointer-events: none; animation: conf 1.5s cubic-bezier(.15, .7, .35, 1) forwards; }
 @keyframes conf { to { transform: translate(var(--x), var(--y)) rotate(var(--r)); opacity: 0; } }
 
@@ -1065,6 +1066,17 @@ html.dark .info-btn.on { color: #1c1c1e; }
 .tip ul { margin: 0; padding-left: 18px; }
 .tip li { margin: 3px 0; color: rgba(255, 255, 255, .86); }
 html.dark .tip { background: #48484e; }
+
+/* trocar o treino do dia: só neste dia ou empurrar a grade */
+.pm-from { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; margin: 2px 0 14px; font-weight: 600; font-size: 15px; }
+.pm-from > span { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 14px; background: var(--fill); }
+.pm-from > svg.i { width: 16px; height: 16px; color: var(--dim); }
+.pm-from svg.i { width: 15px; height: 15px; color: var(--rest); }
+.pm-from .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c); flex: none; }
+.pm-e { font-weight: 400; font-size: 15px; }
+.pm-opt { align-items: center; padding-top: 14px; padding-bottom: 14px; }
+.pm-opt > span:nth-child(2) { font-weight: 600; }
+.pm-opt small { font-weight: 400; line-height: 1.35; margin-top: 3px; }
 
 </style>
 </head>
@@ -2814,10 +2826,44 @@ function ensureAudio() { try { if (!AC) AC = new (window.AudioContext || window.
 function beep() { try { if (!AC) return; const t = AC.currentTime; [0, .18].forEach((d, i) => { const o = AC.createOscillator(), g = AC.createGain(); o.frequency.value = i ? 1180 : 880; g.gain.setValueAtTime(.0001, t + d); g.gain.exponentialRampToValueAtTime(.25, t + d + .02); g.gain.exponentialRampToValueAtTime(.0001, t + d + .16); o.connect(g).connect(AC.destination); o.start(t + d); o.stop(t + d + .18); }); } catch (e) { } }
 let toastT = 0;
 function toast(msg, act) {
-  let el = $('.toast'); if (!el) { el = document.createElement('div'); el.className = 'toast'; el.setAttribute('role', 'status'); document.body.append(el); }
+  let el = $('.toast'); if (!el) { el = document.createElement('div'); el.className = 'toast'; el.setAttribute('role', 'status'); document.body.append(el); toastSwipe(el); }
+  el.style.transition = el.style.transform = el.style.opacity = ''; el.dataset.sw = ''; el._act = !!act;
   el.textContent = msg; el.classList.toggle('act', !!act);
-  if (act) { const b = document.createElement('button'); b.className = 'toast-b'; b.textContent = act.label; b.addEventListener('click', e => { e.stopPropagation(); el.classList.remove('on'); act.fn(); }); el.append(b); }
-  requestAnimationFrame(() => el.classList.add('on')); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), act ? 6000 : 2600);
+  if (act) { const b = document.createElement('button'); b.className = 'toast-b'; b.textContent = act.label; b.addEventListener('click', e => { e.stopPropagation(); if (el.dataset.sw) return; clearTimeout(toastT); el.classList.remove('on'); act.fn(); }); el.append(b); }
+  requestAnimationFrame(() => el.classList.add('on')); toastTimer(el, act ? 6000 : 2600);
+}
+function toastTimer(el, ms) { clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), ms); }
+// aviso do topo: arraste para cima para dispensar, como uma notificação do celular
+function toastSwipe(el) {
+  let id = null, y0 = 0, dy = 0, last = 0, lt = 0, v = 0, moved = false;
+  const put = y => { el.style.transition = 'none'; el.style.transform = `translate(-50%, ${y}px)`; el.style.opacity = y < 0 ? Math.max(.3, 1 + y / 150) : ''; };
+  el.addEventListener('pointerdown', e => {
+    if (!el.classList.contains('on') || (e.pointerType === 'mouse' && e.button)) return;
+    id = e.pointerId; y0 = last = e.clientY; lt = e.timeStamp; dy = v = 0; moved = false; el.dataset.sw = ''; clearTimeout(toastT);
+  });
+  window.addEventListener('pointermove', e => {
+    if (e.pointerId !== id) return;
+    const d = e.clientY - y0;
+    if (!moved && Math.abs(d) < 6) return;
+    moved = true; el.dataset.sw = '1';
+    dy = d < 0 ? d : Math.min(14, d * .22); // para baixo só cede um pouquinho
+    const dt = e.timeStamp - lt; if (dt > 0) { v = .6 * ((e.clientY - last) / dt) + .4 * v; last = e.clientY; lt = e.timeStamp; }
+    put(dy);
+  }, { passive: true });
+  const end = e => {
+    if (e.pointerId !== id) return; id = null;
+    if (!moved) { toastTimer(el, el._act ? 4000 : 2000); return; }
+    if (dy < -28 || v < -.35) {
+      el.style.transition = 'transform .3s cubic-bezier(.3, .7, .4, 1), opacity .3s';
+      el.style.transform = 'translate(-50%, calc(-100% - 24px - var(--sat)))'; el.style.opacity = '0'; buzz(4);
+      setTimeout(() => { if (el.style.opacity !== '0') return; el.style.transition = 'none'; el.classList.remove('on'); el.style.transform = el.style.opacity = ''; void el.offsetWidth; el.style.transition = ''; }, 320);
+    } else {
+      el.style.transition = 'transform .5s var(--spring), opacity .25s'; el.style.transform = 'translate(-50%, 0)'; el.style.opacity = '';
+      toastTimer(el, el._act ? 4000 : 2000);
+    }
+    setTimeout(() => { el.dataset.sw = ''; }, 60);
+  };
+  window.addEventListener('pointerup', end); window.addEventListener('pointercancel', end);
 }
 function confetti() {
   if (RM()) return; const cols = ['#FF3B30', '#007AFF', '#FFCC00', '#34C759', '#FF9500', '#AF52DE'];
@@ -2999,6 +3045,25 @@ function setupWeeks() {
 }
 // rótulo curto para o cartão do dia: Hoje, Amanhã, Ontem ou "Seg, 30 nov"
 function dayTag(ds) { const t = todayISO(); if (ds === t || ds === addDays(t, 1) || ds === addDays(t, -1)) return dayLabel(ds); const d = parse(ds); return `${WD3[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}`; }
+// próximo dia em que o treino aparece na grade (depois de empurrar)
+function nextPlanned(ds, wid) { for (let i = 1; i <= 21; i++) { const d = addDays(ds, i); if (planFor(d) === wid && CFG.overrides[d] === undefined) return d; } return null; }
+function whenLabel(nx, ds) { return nx ? (nx === addDays(todayISO(), 1) ? 'amanhã' : WD[parse(nx).getDay()].toLowerCase() + (nx > addDays(ds, 6) ? ' (' + fmtShort(nx) + ')' : '')) : 'o próximo dia de treino'; }
+const dayWord = ds => { const t = todayISO(); return ds === t ? 'hoje' : ds === addDays(t, 1) ? 'amanhã' : ds === addDays(t, -1) ? 'ontem' : WD[parse(ds).getDay()].toLowerCase() + (Math.abs(diffDays(ds, t)) > 6 ? ' (' + fmtShort(ds) + ')' : ''); };
+// trocar o treino de um dia: pergunta se muda só aquele dia ou se empurra a grade
+function askPlanMode(ds, v) {
+  const prev = wById(planFor(ds)); if (!prev) return;
+  const keep = { o: CFG.overrides[ds], sh: CFG.shifts };
+  CFG.overrides[ds] = v; CFG.shifts = [...(CFG.shifts || []).filter(x => x !== ds), ds].sort(); bump();
+  const nx = nextPlanned(ds, prev.id);
+  if (keep.o === undefined) delete CFG.overrides[ds]; else CFG.overrides[ds] = keep.o; CFG.shifts = keep.sh; bump();
+  const nm = esc(prev.name), chev = I.chevR.replace('class="i"', 'class="i" style="width:16px;color:var(--dim)"');
+  const body = `<div class="pm-from"><span><i class="dot" style="--c:${prev.color}"></i>${nm}</span>${I.chevR}<span>${planIcon(v)}${esc(planLabel(v))}</span></div><div class="list">
+  <button class="opt tap pm-opt" data-a="planMode" data-m="day"><span class="sp-ic">${I.cal}</span><span>Só neste dia<small>${nm} fica de fora desta vez. Os próximos dias continuam como estão.</small></span>${chev}</button>
+  <button class="opt tap pm-opt" data-a="planMode" data-m="push"><span class="sp-ic">${I.skip}</span><span>Empurrar a grade<small>${nm} vai para ${whenLabel(nx, ds)} e os próximos treinos andam um dia. Descanso e esportes ficam no lugar.</small></span>${chev}</button></div>`;
+  const o = openSheet({ title: 'Como trocar o treino?', sub: `${dayTag(ds)} · escolha o que acontece com a grade`, body, foot: '<button class="btn tap" data-a="closeSheet">Cancelar</button>', key: 'pmode' });
+  o.ds = ds; o.v = v; buzz(6);
+}
+const planIcon = v => { const w = wById(v), sp = planSport(v); return w ? `<i class="dot" style="--c:${w.color}"></i>` : sp ? `<b class="pm-e">${sp.e}</b>` : v === 'rest' ? I.moon : ''; };
 function dayLabel(ds) { const t = todayISO(); return ds === t ? 'Hoje' : ds === addDays(t, 1) ? 'Amanhã' : ds === addDays(t, -1) ? 'Ontem' : fmtLong(ds); }
 // escolha da academia do dia (só aparece com 2+ academias)
 function gymPick(ds) {
@@ -3799,9 +3864,9 @@ function dayBody(ds) {
   if (!s && ds <= t) h += sportRow(ds).replace('class="sport-add', 'style="margin:0 0 14px" class="sport-add').replace('class="sport-row"', 'class="sport-row" style="margin:0 0 14px"');
   if (s) h += sportRow(ds).replace('class="sport-add', 'style="margin:-4px 0 14px" class="sport-add').replace('class="sport-row"', 'class="sport-row" style="margin:-4px 0 14px"');
   h += `<div class="lib-sub" style="margin-top:2px">Plano do dia</div>` + planOptions(p, 'setPlan', `data-d="${ds}"`, dayGym(ds));
-  const nat = naturalPlan(ds, true), shifted = (CFG.shifts || []).includes(ds);
-  h += `<p style="color:var(--muted);font-size:14px;margin:12px 4px">${shifted ? `Este dia empurrou ${esc(planLabel(nat))} e os próximos treinos um dia para frente` : `Pelo plano, este dia seria: <b style="color:var(--text)">${esc(planLabel(nat))}</b>`}${has ? ` · <button class="link" data-a="clearPlan" data-d="${ds}">${shifted ? 'desfazer' : 'voltar ao plano'}</button>` : ''}</p>`;
-  if (!has && wById(basePlan(ds))) h += `<p class="hint" style="margin:-4px 4px 12px">Se você trocar o treino deste dia, ele e os próximos treinos andam um dia. Descanso e esportes da semana ficam no lugar.</p>`;
+  const nat = naturalPlan(ds, true), shifted = (CFG.shifts || []).includes(ds), slot = !!wById(basePlan(ds));
+  h += `<p style="color:var(--muted);font-size:14px;margin:12px 4px">${shifted ? `Este dia empurrou ${esc(planLabel(nat))} e os próximos treinos um dia para frente` : has && slot && wById(nat) ? `Só este dia mudou. Pelo plano seria <b style="color:var(--text)">${esc(planLabel(nat))}</b>, e a grade seguiu igual` : `Pelo plano, este dia seria: <b style="color:var(--text)">${esc(planLabel(nat))}</b>`}${has ? ` · <button class="link" data-a="clearPlan" data-d="${ds}">${shifted ? 'desfazer' : 'voltar ao plano'}</button>` : ''}</p>`;
+  if (!has && slot) h += `<p class="hint" style="margin:-4px 4px 12px">Ao trocar o treino deste dia, você escolhe se muda só ele ou se os próximos treinos andam um dia.</p>`;
   const psp = planSport(p);
   if (!s && ds <= t && psp && !sportsOf(ds).length) h += `<div class="dc-actions" style="margin-top:6px"><button class="btn primary tap" data-a="sportPlanLog" data-d="${ds}" data-k="${psp.k}">${psp.e} Registrar ${esc(psp.n.toLowerCase())}</button></div>`;
   else if (!s && ds <= t) { const w = dayWorkout(ds); h += `<div class="dc-actions" style="margin-top:6px">${w ? `<button class="btn primary tap" data-a="start" data-d="${ds}" data-w="${w.id}">${I.play} ${ds === t ? 'Começar' : 'Registrar'} ${esc(w.name)}</button>` : `<button class="btn primary tap" style="flex:1" data-a="startFree" data-d="${ds}">Treino livre</button>`}</div><div class="quick" style="margin-top:10px"><button class="qbtn tap" style="--c:var(--cardio)" data-a="startKind" data-d="${ds}" data-k="cardio">${I.pulse} Só aeróbico</button><button class="qbtn tap" style="--c:var(--stretch)" data-a="startKind" data-d="${ds}" data-k="stretch">${I.leaf} Só alongar</button></div>`; }
@@ -3944,24 +4009,30 @@ const ACT = {
   openSess: t => { while (SHEETS.length) closeSheet(); openSession(t.dataset.d); },
   dayPlan: t => openDaySheet(t.dataset.d),
   setPlan: t => {
-    const ds = t.dataset.d, v = t.dataset.v, pw = wById(v), prev = planFor(ds);
+    const ds = t.dataset.d, v = t.dataset.v, prev = planFor(ds);
     if (v === prev) return;
-    const snap = JSON.stringify({ o: CFG.overrides[ds], g: CFG.dayGym[ds], sh: CFG.shifts || [] });
-    const nat = naturalPlan(ds, true), slot = !!wById(basePlan(ds));
+    const nat = naturalPlan(ds, true), slot = !!wById(basePlan(ds)), has = CFG.overrides[ds] !== undefined;
+    let mode = t.dataset.mode;
+    if (!mode) {
+      if (!slot || v === nat) mode = 'push'; // nada a empurrar, ou voltando ao plano
+      else if (has) mode = (CFG.shifts || []).includes(ds) ? 'push' : 'day'; // o dia já foi trocado: mantém a escolha feita
+      else { askPlanMode(ds, v); return; }
+    }
+    const pw = wById(v), snap = JSON.stringify({ o: CFG.overrides[ds], g: CFG.dayGym[ds], sh: CFG.shifts || [] });
     CFG.shifts = (CFG.shifts || []).filter(x => x !== ds);
-    if (v === nat) delete CFG.overrides[ds]; else { CFG.overrides[ds] = v; if (slot) CFG.shifts.push(ds); }
+    if (v === nat) delete CFG.overrides[ds]; else { CFG.overrides[ds] = v; if (slot && mode === 'push') CFG.shifts.push(ds); }
     CFG.shifts.sort();
     if (pw && !getSession(ds)) CFG.dayGym[ds] = pw.gym;
     saveCfg(); bump(); buzz(8); const o = topSheet('day'); if (o) setSheetBody(o, dayBody(ds)); render();
+    const undo = { label: 'Desfazer', fn: () => {
+      const z = JSON.parse(snap); if (z.o === undefined) delete CFG.overrides[ds]; else CFG.overrides[ds] = z.o; if (z.g === undefined) delete CFG.dayGym[ds]; else CFG.dayGym[ds] = z.g; CFG.shifts = z.sh;
+      saveCfg(); bump(); const o2 = topSheet('day'); if (o2) setSheetBody(o2, dayBody(ds)); render(); buzz(6);
+    } };
     const moved = wById(prev), pushed = slot && v !== nat && CFG.shifts.includes(ds);
-    if (moved && pushed) {
-      let nx = null; for (let i = 1; i <= 21 && !nx; i++) { const d = addDays(ds, i); if (planFor(d) === moved.id && CFG.overrides[d] === undefined) nx = d; }
-      toast(`${moved.name} foi para ${nx ? (nx === addDays(todayISO(), 1) ? 'amanhã' : WD[parse(nx).getDay()].toLowerCase() + (nx > addDays(ds, 6) ? ' (' + fmtShort(nx) + ')' : '')) : 'o próximo dia de treino'}. Os próximos treinos andaram um dia.`, { label: 'Desfazer', fn: () => {
-        const z = JSON.parse(snap); if (z.o === undefined) delete CFG.overrides[ds]; else CFG.overrides[ds] = z.o; if (z.g === undefined) delete CFG.dayGym[ds]; else CFG.dayGym[ds] = z.g; CFG.shifts = z.sh;
-        saveCfg(); bump(); const o2 = topSheet('day'); if (o2) setSheetBody(o2, dayBody(ds)); render(); buzz(6);
-      } });
-    }
+    if (moved && pushed) { const nx = nextPlanned(ds, moved.id); toast(`${moved.name} foi para ${whenLabel(nx, ds)}. Os próximos treinos andaram um dia.`, undo); }
+    else if (moved && slot && v !== nat && !has) toast(`Só ${dayWord(ds)} mudou. O resto da grade continua igual.`, undo);
   },
+  planMode: t => { const o = topSheet('pmode'); if (!o) return; const { ds, v } = o; closeSheet(o); ACT.setPlan({ dataset: { d: ds, v, mode: t.dataset.m } }); },
   clearPlan: t => { const ds = t.dataset.d; delete CFG.overrides[ds]; CFG.shifts = (CFG.shifts || []).filter(x => x !== ds); saveCfg(); bump(); const o = topSheet('day'); if (o) setSheetBody(o, dayBody(ds)); render(); toast('O dia voltou ao plano e os treinos voltaram para o lugar'); },
   weekPick: t => openWeekPick(+t.dataset.wd),
   setWeek: t => { logWeek(); CFG.week[+t.dataset.wd] = t.dataset.v; saveCfg(); bump(); buzz(8); $$('.sheet .opt').forEach(b => b.classList.toggle('on', b === t)); setTimeout(() => closeSheet(topSheet('wk')), 260); render(); toast('Plano da semana atualizado'); },
