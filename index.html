@@ -3025,12 +3025,13 @@ function vHome() {
 const WK_BACK = 1, WK_FWD = 6;
 function weekPageOf(ds) { return clamp(Math.round(diffDays(weekStart(ds), weekStart(todayISO())) / 7) + WK_BACK, 0, WK_BACK + WK_FWD); }
 function weekLabel(i) {
+  if (!Number.isFinite(i)) i = WK_BACK;
   const k = i - WK_BACK; if (k === 0) return 'Esta semana'; if (k === 1) return 'Próxima semana'; if (k === -1) return 'Semana passada';
   const a = addDays(weekStart(todayISO()), k * 7), b = addDays(a, 6), A = parse(a), B = parse(b);
   return A.getMonth() === B.getMonth() ? `${A.getDate()} a ${B.getDate()} de ${MONTHS[B.getMonth()]}` : `${A.getDate()} ${MONTHS[A.getMonth()].slice(0, 3)} a ${B.getDate()} ${MONTHS[B.getMonth()].slice(0, 3)}`;
 }
 function weekStrip() {
-  const t = todayISO(), w0 = weekStart(t), pg = UI.wkPage ?? weekPageOf(UI.sel), n = WK_BACK + WK_FWD + 1;
+  const t = todayISO(), w0 = weekStart(t), pg = Number.isFinite(UI.wkPage) ? UI.wkPage : weekPageOf(UI.sel), n = WK_BACK + WK_FWD + 1;
   let h = `<div class="wk-head"><button class="wk-nav tap" data-a="wkNav" data-v="-1" aria-label="Semana anterior" ${pg <= 0 ? 'disabled' : ''}>${I.chevL}</button><span id="wk-lbl">${weekLabel(pg)}</span><button class="wk-nav tap" data-a="wkNav" data-v="1" aria-label="Próxima semana" ${pg >= n - 1 ? 'disabled' : ''}>${I.chevR}</button></div><div class="weeks" id="weeks">`;
   for (let k = -WK_BACK; k <= WK_FWD; k++) {
     const ws = addDays(w0, k * 7); h += '<div class="week">';
@@ -3051,12 +3052,13 @@ function weekStrip() {
 // coloca a faixa na semana certa e acompanha o arraste
 function setupWeeks() {
   const el = $('#weeks'); if (!el) return;
-  const pages = el.children, pg = UI.wkPage ?? weekPageOf(UI.sel);
+  const pages = el.children, pg = Number.isFinite(UI.wkPage) ? UI.wkPage : weekPageOf(UI.sel);
   const stepW = () => pages.length > 1 ? pages[1].offsetLeft - pages[0].offsetLeft : el.clientWidth;
   el.scrollLeft = pg * stepW();
   let tm = 0, live = false; setTimeout(() => { live = true; }, 120);
   el.addEventListener('scroll', () => {
-    const i = clamp(Math.round(el.scrollLeft / stepW()), 0, pages.length - 1);
+    const sw = stepW(); if (!sw || !el.isConnected) return; // tela redesenhada no meio da rolagem
+    const i = clamp(Math.round(el.scrollLeft / sw), 0, pages.length - 1);
     if (i !== UI.wkPage) { UI.wkPage = i; const l = $('#wk-lbl'); if (l) l.textContent = weekLabel(i); $$('.wk-dots i').forEach((d, j) => d.classList.toggle('on', j === i)); $$('.wk-nav').forEach(b => { b.disabled = (+b.dataset.v < 0 && i <= 0) || (+b.dataset.v > 0 && i >= pages.length - 1); }); }
     if (live) { clearTimeout(tm); tm = setTimeout(() => buzz(3), 90); }
   }, { passive: true });
@@ -3067,13 +3069,33 @@ function dayTag(ds) { const t = todayISO(); if (ds === t || ds === addDays(t, 1)
 function nextPlanned(ds, wid) { for (let i = 1; i <= 21; i++) { const d = addDays(ds, i); if (planFor(d) === wid && CFG.overrides[d] === undefined) return d; } return null; }
 function whenLabel(nx, ds) { return nx ? (nx === addDays(todayISO(), 1) ? 'amanhã' : WD[parse(nx).getDay()].toLowerCase() + (nx > addDays(ds, 6) ? ' (' + fmtShort(nx) + ')' : '')) : 'o próximo dia de treino'; }
 const dayWord = ds => { const t = todayISO(); return ds === t ? 'hoje' : ds === addDays(t, 1) ? 'amanhã' : ds === addDays(t, -1) ? 'ontem' : WD[parse(ds).getDay()].toLowerCase() + (Math.abs(diffDays(ds, t)) > 6 ? ' (' + fmtShort(ds) + ')' : ''); };
+// sem plano da semana, os treinos são escolhidos dia a dia (CFG.overrides): empurrar reescreve esses dias.
+// Descanso, esportes e dias já treinados ficam no lugar; dias sem plano recebem treino.
+const dayOpen = (d, val) => movable(val) && !getSession(d);
+function nextOpenDay(ds) { let d = ds; for (let i = 0; i < 60; i++) { d = addDays(d, 1); if (dayOpen(d, validPlan(CFG.overrides[d] ?? 'free'))) return d; } return null; }
+function putDay(d, val) { if (val === 'free') delete CFG.overrides[d]; else CFG.overrides[d] = val; const w = wById(val); if (w && !getSession(d)) CFG.dayGym[d] = w.gym; }
+function pushDays(ds, carry) {
+  const last = Object.keys(CFG.overrides).sort().pop() || ds; let d = ds, nx = null;
+  for (let i = 0; i < 500; i++) {
+    d = addDays(d, 1);
+    const cur = validPlan(CFG.overrides[d] ?? 'free');
+    if (!dayOpen(d, cur)) continue;
+    if (!nx && wById(carry)) nx = d;
+    putDay(d, carry); carry = cur;
+    if (carry === 'free' && d >= last) break;
+  }
+  return nx;
+}
 // trocar o treino de um dia: pergunta se muda só aquele dia ou se empurra a grade
 function askPlanMode(ds, v) {
-  const gw = wById(naturalPlan(ds, true)); if (!gw) return; // o treino que a grade coloca neste dia
-  const cur = planFor(ds), keep = { o: CFG.overrides[ds], sh: CFG.shifts };
-  CFG.overrides[ds] = v; CFG.shifts = [...(CFG.shifts || []).filter(x => x !== ds), ds].sort(); bump();
-  const nx = nextPlanned(ds, gw.id);
-  if (keep.o === undefined) delete CFG.overrides[ds]; else CFG.overrides[ds] = keep.o; CFG.shifts = keep.sh; bump();
+  const cur = planFor(ds); let gw, nx;
+  if (weekOn()) {
+    gw = wById(naturalPlan(ds, true)); if (!gw) return; // o treino que a grade coloca neste dia
+    const keep = { o: CFG.overrides[ds], sh: CFG.shifts };
+    CFG.overrides[ds] = v; CFG.shifts = [...(CFG.shifts || []).filter(x => x !== ds), ds].sort(); bump();
+    nx = nextPlanned(ds, gw.id);
+    if (keep.o === undefined) delete CFG.overrides[ds]; else CFG.overrides[ds] = keep.o; CFG.shifts = keep.sh; bump();
+  } else { gw = wById(cur); if (!gw) return; nx = nextOpenDay(ds); } // sem plano da semana: o treino escolhido para o dia
   const nm = esc(gw.name), chev = I.chevR.replace('class="i"', 'class="i" style="width:16px;color:var(--dim)"');
   const body = `<div class="pm-from"><span>${planIcon(cur)}${esc(planLabel(cur))}</span>${I.chevR}<span>${planIcon(v)}${esc(planLabel(v))}</span></div><div class="list">
   <button class="opt tap pm-opt" data-a="planMode" data-m="day"><span class="sp-ic">${I.cal}</span><span>Só neste dia<small>${nm} fica de fora desta vez. Os próximos dias seguem a grade normal.</small></span>${chev}</button>
@@ -3884,7 +3906,7 @@ function dayBody(ds) {
   if (s) h += sportRow(ds).replace('class="sport-add', 'style="margin:-4px 0 14px" class="sport-add').replace('class="sport-row"', 'class="sport-row" style="margin:-4px 0 14px"');
   h += `<div class="lib-sub" style="margin-top:2px">Plano do dia</div>` + planOptions(p, 'setPlan', `data-d="${ds}"`, dayGym(ds));
   const nat = naturalPlan(ds, true), shifted = (CFG.shifts || []).includes(ds), slot = movable(basePlan(ds)) && !!wById(nat);
-  if (!weekOn()) h += has ? `<p style="color:var(--muted);font-size:14px;margin:12px 4px">Escolhido só para este dia · <button class="link" data-a="clearPlan" data-d="${ds}">tirar plano</button></p>` : '';
+  if (!weekOn()) h += has ? `<p style="color:var(--muted);font-size:14px;margin:12px 4px">Escolhido para este dia · <button class="link" data-a="clearPlan" data-d="${ds}">tirar plano</button></p>${wById(p) && !s ? `<p class="hint" style="margin:-4px 4px 12px">Ao trocar o treino deste dia, você escolhe se muda só ele ou se os próximos treinos andam um dia.</p>` : ''}` : '';
   else h += `<p style="color:var(--muted);font-size:14px;margin:12px 4px">${shifted ? `Este dia empurrou ${esc(planLabel(nat))} e os próximos treinos um dia para frente` : has && slot && wById(nat) ? `Só este dia mudou. Pelo plano seria <b style="color:var(--text)">${esc(planLabel(nat))}</b>, e a grade seguiu igual` : `Pelo plano, este dia seria: <b style="color:var(--text)">${esc(planLabel(nat))}</b>`}${has ? ` · <button class="link" data-a="clearPlan" data-d="${ds}">${shifted ? 'desfazer' : 'voltar ao plano'}</button>` : ''}</p>`;
   if (!has && slot) h += `<p class="hint" style="margin:-4px 4px 12px">Ao trocar o treino deste dia, você escolhe se muda só ele ou se os próximos treinos andam um dia.</p>`;
   const psp = planSport(p);
@@ -4024,7 +4046,7 @@ const ACT = {
   lkRestart: () => { const L = UI.lock; L.first = null; L.buf = ''; L.mode = L.mode === 'newpin2' ? 'newpin' : 'set'; renderLock(); },
   kp: t => kpPress(t.dataset.k),
   selDay: t => { UI.sel = t.dataset.d; UI.wkPage = weekPageOf(UI.sel); render(); buzz(5); },
-  wkNav: t => { const el = $('#weeks'); if (!el) return; const pages = el.children, step = pages.length > 1 ? pages[1].offsetLeft - pages[0].offsetLeft : el.clientWidth; const i = clamp((UI.wkPage ?? weekPageOf(UI.sel)) + (+t.dataset.v), 0, pages.length - 1); el.scrollTo({ left: i * step, behavior: RM() ? 'auto' : 'smooth' }); buzz(4); },
+  wkNav: t => { const el = $('#weeks'); if (!el) return; const pages = el.children, step = pages.length > 1 ? pages[1].offsetLeft - pages[0].offsetLeft : el.clientWidth; const i = clamp(((Number.isFinite(UI.wkPage) ? UI.wkPage : weekPageOf(UI.sel))) + (+t.dataset.v), 0, pages.length - 1); el.scrollTo({ left: i * step, behavior: RM() ? 'auto' : 'smooth' }); buzz(4); },
   start: t => { ensureAudio(); startSession(t.dataset.d, t.dataset.w); buzz(12); },
   startFree: t => { ensureAudio(); const ds = t.dataset.d; if (!getSession(ds)) putSession(newSession(ds, null, 'Treino livre')); startSession(ds); setTimeout(() => ACT.addEx(), 500); },
   startKind: t => { ensureAudio(); const ds = t.dataset.d, k = t.dataset.k; if (!getSession(ds)) putSession(newSession(ds, null, k === 'cardio' ? 'Aeróbico' : 'Alongamento')); startSession(ds); setTimeout(() => k === 'cardio' ? ACT.addCardio() : ACT.addStretch(), 500); },
@@ -4033,6 +4055,19 @@ const ACT = {
   setPlan: t => {
     const ds = t.dataset.d, v = t.dataset.v, prev = planFor(ds);
     if (v === prev) return;
+    if (!weekOn()) {
+      // sem plano da semana: pergunta quando o dia já tinha um treino escolhido
+      const pw0 = wById(prev); let mode = t.dataset.mode;
+      if (!mode) { if (!pw0) mode = 'day'; else { askPlanMode(ds, v); return; } }
+      const snap = JSON.stringify({ o: CFG.overrides, g: CFG.dayGym });
+      putDay(ds, v); bump();
+      const nx = mode === 'push' && pw0 ? pushDays(ds, prev) : null;
+      saveCfg(); bump(); buzz(8); const o = topSheet('day'); if (o) setSheetBody(o, dayBody(ds)); render();
+      const undo = { label: 'Desfazer', fn: () => { const z = JSON.parse(snap); CFG.overrides = z.o; CFG.dayGym = z.g; saveCfg(); bump(); const o2 = topSheet('day'); if (o2) setSheetBody(o2, dayBody(ds)); render(); buzz(6); } };
+      if (pw0 && mode === 'push') toast(`${pw0.name} foi para ${whenLabel(nx, ds)}. Os próximos treinos andaram um dia.`, undo);
+      else if (pw0) toast(`Só ${dayWord(ds)} mudou. Os outros dias continuam iguais.`, undo);
+      return;
+    }
     // só há o que empurrar quando a grade põe um treino neste dia
     const nat = naturalPlan(ds, true), slot = movable(basePlan(ds)) && !!wById(nat), has = CFG.overrides[ds] !== undefined;
     let mode = t.dataset.mode;
